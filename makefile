@@ -4,15 +4,19 @@ AS = as
 LD = ld
 GRUB_MKRESCUE = grub-mkrescue
 
-# Flags (Added -m32 for 32-bit architecture matching)
+# Flags for 32-bit standalone kernel development
 CFLAGS = -m32 -std=gnu99 -ffreestanding -O2 -Wall -Wextra
 ASFLAGS = --32
 LDFLAGS = -m elf_i386 -T linker.ld -nostdlib
 
-# Project Files
-C_SOURCES = kernel.c
+# Automatically find all C source files in the directory
+C_SOURCES = $(wildcard *.c)
 ASM_SOURCES = boot.s
-OBJECTS = boot.o kernel.o
+
+# Generate object file lists from source files
+C_OBJECTS = $(C_SOURCES:.c=.o)
+ASM_OBJECTS = $(ASM_SOURCES:.s=.o)
+OBJECTS = $(ASM_OBJECTS) $(C_OBJECTS)
 
 # Output Names
 KERNEL = kernel.bin
@@ -24,7 +28,7 @@ all: $(ISO)
 %.o: %.s
 	$(AS) $(ASFLAGS) $< -o $@
 
-# Compile C kernel
+# Compile C files automatically
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -39,7 +43,6 @@ $(ISO): $(KERNEL)
 	cp grub.cfg iso/boot/grub/grub.cfg
 	$(GRUB_MKRESCUE) -o $(ISO) iso
 
-# Run the ISO in QEMU
 # Run the ISO in QEMU
 run: $(ISO)
 	/mnt/d/mysys2/ucrt64/bin/qemu-system-x86_64.exe -cdrom $(ISO) -vga std -display sdl
