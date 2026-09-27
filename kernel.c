@@ -17,15 +17,21 @@ static inline unsigned char inb(unsigned short port) {
     __asm__ volatile ("inb %1, %0" : "=a"(result) : "Nd"(port));
     return result;
 }
+// Check if keyboard buffer has data ready to read
+int keyboard_is_ready() {
+    return inb(0x64) & 1;
+}
+
 void clear_screen() {
-    unsigned char *vga = (unsigned char *) VGA_ADDRESS;
-    for (int i = 0; i < 80 * 25 * 2; i += 2) {
-        vga[i] = ' ';     
-        vga[i+1] = current_color;  
+    volatile unsigned char *vga = (unsigned char *) VGA_ADDRESS;
+    for (int i = 0; i < 4000; i += 2) {
+        vga[i] = ' ';
+        vga[i+1] = 0x0F;
     }
     cursor_row = 0;
     cursor_col = 0;
 }
+
 
 void newline() {
     cursor_col = 0;
@@ -57,7 +63,9 @@ int strcmp(char *s1, char *s2) {
 }
 
 void kernel_main() {
+    
     clear_screen();
+    
     
     // Print initial CLI prompt
     char *prompt = "root> ";
@@ -70,6 +78,10 @@ void kernel_main() {
     int buf_index = 0;
 
     while(1) {
+        if (!keyboard_is_ready()) {
+            continue;
+        }
+        
         unsigned char scancode = inb(0x60);
         
         if (scancode > 0 && scancode != last_scancode && !(scancode & 0x80)) {

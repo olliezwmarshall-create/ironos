@@ -1,38 +1,49 @@
-# Variables
-ASM = nasm
+# Compiler and Tools
 CC = gcc
+AS = as
 LD = ld
-CFLAGS = -m32 -ffreestanding -nostdlib -fno-pie -Os
+GRUB_MKRESCUE = grub-mkrescue
 
-all: os.img
+# Flags (Added -m32 for 32-bit architecture matching)
+CFLAGS = -m32 -std=gnu99 -ffreestanding -O2 -Wall -Wextra
+ASFLAGS = --32
+LDFLAGS = -m elf_i386 -T linker.ld -nostdlib
 
-# Combine bootloader and kernel into a single floppy disk image
-os.img: bootloader.bin kernel.bin
-	cat bootloader.bin kernel.bin > os.img
+# Project Files
+C_SOURCES = kernel.c
+ASM_SOURCES = boot.s
+OBJECTS = boot.o kernel.o
 
-# Compile the 16-bit bootloader
-bootloader.bin: bootloader.asm
-	$(ASM) -f bin bootloader.asm -o bootloader.bin
+# Output Names
+KERNEL = kernel.bin
+ISO = ironos.iso
 
-# Link the kernel objects into a raw binary
-# Link the kernel objects into a temporary file, then convert to raw binary using objcopy
-kernel.bin: entry.o kernel.o linker.ld
-	$(LD) -m i386pe -T linker.ld -o kernel.tmp entry.o kernel.o
-	objcopy -O binary kernel.tmp kernel.bin
-	rm -f kernel.tmp
+all: $(ISO)
 
-# Compile the 32-bit assembly entry stub
-entry.o: entry.asm
-	$(ASM) -f elf32 entry.asm -o entry.o
+# Compile assembly boot stub
+%.o: %.s
+	$(AS) $(ASFLAGS) $< -o $@
 
-# Compile the C kernel with size optimization (-Os)
-kernel.o: kernel.c
-	$(CC) $(CFLAGS) -c kernel.c -o kernel.o
+# Compile C kernel
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
-# Run the OS in QEMU using floppy emulation
-run: os.img
-	qemu-system-x86_64 -fda os.img
+# Link the kernel binary
+$(KERNEL): $(OBJECTS)
+	$(LD) $(LDFLAGS) $(OBJECTS) -o $(KERNEL)
+
+# Build the bootable GRUB ISO
+$(ISO): $(KERNEL)
+	mkdir -p iso/boot/grub
+	cp $(KERNEL) iso/boot/kernel.bin
+	cp grub.cfg iso/boot/grub/grub.cfg
+	$(GRUB_MKRESCUE) -o $(ISO) iso
+
+# Run the ISO in QEMU
+# Run the ISO in QEMU
+run: $(ISO)
+	/mnt/d/mysys2/ucrt64/bin/qemu-system-x86_64.exe -cdrom $(ISO) -vga std -display sdl
 
 # Clean up build artifacts
 clean:
-	rm -f *.bin *.o os.img
+	rm -rf *.o $(KERNEL) $(ISO) iso

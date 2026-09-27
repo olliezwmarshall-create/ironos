@@ -1,11 +1,11 @@
-ENTRY(start)
+ENTRY(_start)
 
 SECTIONS
 {
-    . = 0x1000;
+    . = 1M;
 
     .text : {
-        entry.o(.text)
+        *(.multiboot)
         *(.text)
     }
 
@@ -18,6 +18,7 @@ SECTIONS
     }
 
     .bss : {
+        *(COMMON)
         *(.bss)
     }
 }
