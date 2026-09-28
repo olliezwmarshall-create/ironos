@@ -3,6 +3,7 @@ void Cli(){
 
 while(1) {
         if (!keyboard_is_ready()) {
+            uptime_ticks++;
             continue;
         }
         
@@ -20,11 +21,10 @@ while(1) {
                 
                 // Check what command they typed
                 if (strcmp(cmd_buffer, "help") == 0) {
-                    char *msg = "Commands: help, clear, hello, reboot, color 0-4";
+                    char *msg = "Commands: help, clear, hello, reboot, color 0-4, banner";
                     newline();
                     for(int i = 0; msg[i] != '\0'; i++) print_char(msg[i]);
                     newline();
-
                 } 
                 else if (strcmp(cmd_buffer, "clear") == 0) {
                     clear_screen();
@@ -80,6 +80,12 @@ while(1) {
                     newline();
                     system_reboot();
                 }
+                else if (strcmp(cmd_buffer, "banner") == 0) {
+                    print_banner();
+                }
+                else if (buf_index == 0) {
+                    // If the user just pressed Enter without typing anything, do nothing
+                }
                 else if (buf_index > 0) {
                     newline();
                     if(cursor_row !=0){
@@ -91,7 +97,7 @@ while(1) {
                 
                 // Reset buffer and print new prompt
                 buf_index = 0;
-                char *p = "root> ";
+                char *p = "kernel$> ";
                 for(int i = 0; p[i] != '\0'; i++) {
                     print_char(p[i]);
                 }
@@ -117,6 +123,20 @@ while(1) {
         
         if (scancode & 0x80) {
             last_scancode = 0;
+        }
+        if (scancode == 0x48) { // Up Arrow
+            if (top_rendered_line > 0) {
+                top_rendered_line--;
+                bottom_rendered_line--;
+                render_screen();
+            }
+        } 
+        else if (scancode == 0x50) { // Down Arrow
+            if (bottom_rendered_line < total_lines_written) {
+                top_rendered_line++;
+                bottom_rendered_line++;
+                render_screen();
+            }
         }
     }
 }

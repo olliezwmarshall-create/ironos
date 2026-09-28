@@ -16,11 +16,3 @@ int strcmp(char *s1, char *s2) {
     }
     return *(unsigned char *)s1 - *(unsigned char *)s2;
 }
-void system_shutdown() {
-    // Send shutdown signal using outw (16-bit word) instead of outb
-    outw(0xB004, 0x2000);
-
-    while (1) {
-        __asm__ volatile ("cli; hlt");
-    }
-}
