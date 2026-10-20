@@ -142,6 +142,7 @@ void desktop_run(void) {
     draw();
     unsigned long last = uptime_ticks / TIMER_HZ;
     for (;;) {
+        net_poll();
         int key = keyboard_getchar();
         if (key < 0) {
             if (uptime_ticks / TIMER_HZ != last) { last = uptime_ticks / TIMER_HZ; draw(); }

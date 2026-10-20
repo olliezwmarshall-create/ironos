@@ -154,6 +154,7 @@ void graphics_demo(void) {
     unsigned long last = uptime_ticks;
     frame(px, py, angle);
     for (;;) {
+        net_poll();
         int k = keyboard_getchar();
         if (k == 27) break;
         unsigned long now = uptime_ticks;

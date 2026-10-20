@@ -45,3 +45,9 @@ Run it after editing files in QEMU to confirm the image is healthy.
 
 See [INSTALL.md](INSTALL.md) for the BIOS/legacy installer, disk erase confirmation,
 WSL `make run` workflow, and booting the installed system with `make run-installed`.
+
+## Networking
+
+PCI RTL8139 Ethernet is supported through its legacy interface. See
+[NETWORK.md](NETWORK.md) for DHCP, DNS, ping, QEMU NAT and current limitations.
+Wi-Fi and USB network adapters still need separate drivers.

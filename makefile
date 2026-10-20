@@ -8,6 +8,8 @@ GRUB_DIR ?= /usr/lib/grub/i386-pc
 PYTHON ?= python3
 # Native QEMU works in Linux/WSLg; retain the existing Windows installation as a fallback.
 QEMU ?= $(shell command -v qemu-system-x86_64 2>/dev/null || command -v qemu-system-x86_64.exe 2>/dev/null || { test ! -f /mnt/d/mysys2/ucrt64/bin/qemu-system-x86_64.exe || echo /mnt/d/mysys2/ucrt64/bin/qemu-system-x86_64.exe; })
+# User-mode NAT needs no admin privileges; disable with QEMU_NETWORK=
+QEMU_NETWORK ?= -netdev user,id=net0 -device rtl8139,netdev=net0,romfile=
 QEMU_FLAGS ?=
 QEMU_MEMORY ?= 256
 INSTALL_IMAGE = build/install.img
@@ -68,18 +70,28 @@ $(INSTALL_DISK):
 # QEMU_FLAGS can select a display/monitor; source and image paths stay relative for WSL.
 run: $(ISO) $(DISK) $(INSTALL_DISK)
 	@test -n "$(QEMU)" || { echo 'QEMU not found. Install qemu-system-x86 or set QEMU=/mnt/c/.../qemu-system-x86_64.exe'; exit 1; }
-	"$(QEMU)" -m $(QEMU_MEMORY) -cdrom $(ISO) -drive file=$(DISK),format=raw,if=ide,index=0 -drive file=$(INSTALL_DISK),format=raw,if=ide,index=1 -boot d -vga std $(QEMU_FLAGS)
+	"$(QEMU)" -m $(QEMU_MEMORY) -cdrom $(ISO) -drive file=$(DISK),format=raw,if=ide,index=0 -drive file=$(INSTALL_DISK),format=raw,if=ide,index=1 -boot d -vga std $(QEMU_NETWORK) $(QEMU_FLAGS)
 
 # After live installation, verify the target boots without the live ISO or data disk.
 run-installed: $(INSTALL_DISK)
 	@test -n "$(QEMU)" || { echo 'QEMU not found; set QEMU=/path/to/qemu'; exit 1; }
-	"$(QEMU)" -m $(QEMU_MEMORY) -drive file=$(INSTALL_DISK),format=raw,if=ide,index=0 -boot c -vga std $(QEMU_FLAGS)
+	"$(QEMU)" -m $(QEMU_MEMORY) -drive file=$(INSTALL_DISK),format=raw,if=ide,index=0 -boot c -vga std $(QEMU_NETWORK) $(QEMU_FLAGS)
 
 test-install: $(ISO)
 	$(PYTHON) tools/test_install.py --qemu "$(QEMU)"
 
 test-screen:
 	@set -e; test_bin=$$(mktemp /tmp/ironos-screen-test.XXXXXX); trap 'rm -f "$$test_bin"' EXIT; $(CC) -std=gnu99 -Wall -Wextra -fno-builtin -fsanitize=address -DHOST_TEST tools/test_screen.c -o "$$test_bin"; "$$test_bin"
+
+test-network-driver:
+	@set -e; test_bin=$$(mktemp /tmp/ironos-nic-test.XXXXXX); trap 'rm -f "$$test_bin"' EXIT; $(CC) -std=gnu99 -Wall -Wextra -Wno-pointer-to-int-cast -fno-builtin -fsanitize=address,undefined -DHOST_TEST tools/test_rtl8139.c -o "$$test_bin"; "$$test_bin"
+
+test-network-host:
+	@set -e; test_bin=$$(mktemp /tmp/ironos-net-test.XXXXXX); trap 'rm -f "$$test_bin"' EXIT; $(CC) -std=gnu99 -Wall -Wextra -fno-builtin -fsanitize=address,undefined -DHOST_TEST tools/test_net.c -o "$$test_bin"; "$$test_bin"
+
+test-network: $(ISO)
+	$(PYTHON) tools/test_network.py --qemu "$(QEMU)"
+	$(PYTHON) tools/test_network_fixture.py --qemu "$(QEMU)"
 
 test-graphics: $(ISO)
 	$(PYTHON) tools/test_graphics.py --qemu "$(QEMU)"
@@ -93,7 +105,7 @@ test-desktop: $(ISO)
 test-installer-host:
 	@set -e; test_bin=$$(mktemp /tmp/ironos-installer-test.XXXXXX); trap 'rm -f "$$test_bin"' EXIT; $(CC) -std=gnu99 -Wall -Wextra -fno-builtin -DHOST_TEST tools/test_installer.c -o "$$test_bin"; "$$test_bin"
 
-.PHONY: all run run-installed clean disk test-install test-installer-host test-desktop test-history test-graphics test-screen
+.PHONY: all run run-installed clean disk test-install test-installer-host test-desktop test-history test-graphics test-screen test-network test-network-host test-network-driver
 
 clean:
 	rm -rf *.o $(KERNEL) $(ISO) iso build/install.img

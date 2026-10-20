@@ -197,6 +197,16 @@ struct ata_drive {
 };
 const struct ata_drive *ata_drive_get(int index);
 
+// rtl8139.c / net.c (polled Ethernet + IPv4)
+int rtl8139_init(void);
+int rtl8139_present(void);
+int rtl8139_link(void);
+const unsigned char *rtl8139_mac(void);
+int rtl8139_send(const void *packet, unsigned int n);
+int rtl8139_receive(unsigned char *packet, unsigned int capacity);
+void net_poll(void);
+void net_command(const char *cmd, const char *arg);
+
 // pci.c
 struct pci_loc { unsigned char bus, dev, fn; };
 unsigned int pci_read32(unsigned int bus, unsigned int dev, unsigned int fn, unsigned int reg);

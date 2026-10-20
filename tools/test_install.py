@@ -23,7 +23,7 @@ class VM:
         for firmware in args.firmware:
             flags += ['-L', firmware]
         cmd = ['make', 'run-installed' if installed else 'run', f'QEMU={args.qemu}',
-               'QEMU_MEMORY=256', f'INSTALL_DISK={work}/target.img',
+               'QEMU_MEMORY=256', 'QEMU_NETWORK=' + getattr(args, 'network', ''), f'INSTALL_DISK={work}/target.img',
                f'DISK={work}/data.img', 'QEMU_FLAGS=' + ' '.join(flags)]
         self.log = open(work / ('installed.log' if installed else 'live.log'), 'w')
         self.p = subprocess.Popen(cmd, stdout=self.log, stderr=self.log)

@@ -20,8 +20,8 @@ non-printing bytes with dots and do not modify files. The browser uses the
 current mount permissions and restores the terminal's working directory on
 exit. The terminal's scrollback is preserved.
 
-This is a text-mode desktop, not a graphical window manager. Networking and
-mouse support are not implemented in this change.
+This is a text-mode desktop, not a graphical window manager. Mouse support is not implemented. Ethernet commands are available in the
+terminal; see [NETWORK.md](NETWORK.md).
 
 Validation: `make test-desktop` runs a disposable QEMU VM and exercises the
 launcher, system panel, file previews, directory navigation, working-directory

@@ -206,7 +206,7 @@ int editor_run(const char *path) {
         draw();
 
         int k;
-        while ((k = keyboard_getchar()) < 0) halt();
+        while ((k = keyboard_getchar()) < 0) { net_poll(); halt(); }
         int was_armed = quit_armed;
         set_msg("");                 // a message stays until the next key press
 
