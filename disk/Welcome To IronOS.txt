@@ -1,0 +1,2 @@
+This file has a long name (with spaces and capitals).
+The FAT driver reads long file names, so you can type the whole thing.

@@ -3,22 +3,26 @@ ENTRY(_start)
 SECTIONS
 {
     . = 1M;
+    kernel_start = .;
 
     .text : {
         *(.multiboot)
-        *(.text)
+        *(.text*)
     }
 
     .rodata : {
-        *(.rodata)
+        *(.rodata*)
     }
 
     .data : {
-        *(.data)
+        *(.data*)
     }
 
     .bss : {
         *(COMMON)
-        *(.bss)
+        *(.bss*)
     }
+
+    . = ALIGN(4096);
+    kernel_end = .;
 }

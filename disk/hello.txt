@@ -1,0 +1,2 @@
+Hello from the IronOS disk!
+If you can read this, the ATA driver and FAT driver both work.

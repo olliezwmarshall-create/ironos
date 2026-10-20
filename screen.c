@@ -1,5 +1,19 @@
 #include "kernel.h"
 
+static int batch_depth = 0;
+
+void vga_set_cursor(int row, int col) {
+    unsigned short pos = (unsigned short)(row * 80 + col);      // row 25 is off-screen, which hides the cursor
+    outb(0x3D4, 0x0F); outb(0x3D5, (unsigned char)(pos & 0xFF));
+    outb(0x3D4, 0x0E); outb(0x3D5, (unsigned char)(pos >> 8));
+}
+
+void screen_batch_begin() { batch_depth++; }
+void screen_batch_end() {
+    if (batch_depth > 0) batch_depth--;
+    if (batch_depth == 0) render_screen();
+}
+
 void print_banner() {
     char *banner[] = {
         " ___ ____  ____  _   _    ___  ____  ",
@@ -70,7 +84,7 @@ void print_char(char c) {
     }
 
     // 5. Redraw the screen so changes show up instantly
-    render_screen();
+    if (!batch_depth) render_screen();
 }
 
 void newline() {
@@ -86,7 +100,7 @@ void newline() {
         bottom_rendered_line++;
     }
 
-    render_screen();
+    if (!batch_depth) render_screen();
 }
 void render_screen() {
     unsigned char *vga = (unsigned char *) 0xB8000;
@@ -112,4 +126,14 @@ void render_screen() {
             vga[vga_offset + 1] = current_color;
         }
     }
+}
+void print_string(const char *s) {
+    screen_batch_begin();
+    for (int i = 0; s[i] != '\0'; i++) print_char(s[i]);
+    screen_batch_end();
+
+    // Show the blinking cursor where the next character will go (hidden if scrolled out of view)
+    int crow = cursor_row - top_rendered_line;
+    if (crow >= 0 && crow < 25) vga_set_cursor(crow, cursor_col);
+    else vga_set_cursor(25, 0);
 }

@@ -7,27 +7,36 @@ int total_lines_written = 0;
 int cursor_row = 1;
 int cursor_col = 0;
 unsigned char current_color = 0x0F;
-unsigned char last_scancode = 0;
 char cmd_buffer[80];
 int buf_index = 0;
-unsigned long uptime_ticks = 0;
+volatile unsigned long uptime_ticks = 0;
 
-unsigned char scancode_map[] = {
-    0,  27, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b',
-    '\t', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\n',
-    0, 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '`', 0,
-    '\\', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', 0,
-    '*', 0, ' '
-};
+void kernel_main(unsigned int magic, unsigned int mbi) {
+    gdt_init();
+    interrupts_init();
+    timer_init(TIMER_HZ);
+    keyboard_init();
 
-void kernel_main() {
+    // 0x2BADB002 means a Multiboot loader (GRUB) gave us a valid info struct
+    unsigned int usable_pages = 0;
+    if (magic == 0x2BADB002)
+        usable_pages = pmm_init(mbi);
+    heap_init();
+
+    ata_init();      // find disks: IDE, then SATA (AHCI), then NVMe; then their partitions.
+    ahci_init();     // (the first FAT volume gets mounted read-only by the CLI)
+    nvme_init();
+    disk_scan();
+
     clear_screen();
     print_banner();
-    // Print initial CLI prompt
-    char *prompt = "kernel$> ";
-    for(int i = 0; prompt[i] != '\0'; i++) {
-        print_char(prompt[i]);
+    if (usable_pages == 0) {
+        print_string("WARNING: no memory map from bootloader");
+        newline();
     }
+    print_disk_summary();
+    print_prompt();
 
-    Cli(); 
+    sti();   // interrupts on: timer + keyboard start firing
+    Cli();
 }

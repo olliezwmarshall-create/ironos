@@ -29,7 +29,11 @@ _start:
     # 2. Ensure stack is 16-byte aligned (Crucial for GCC-compiled C code)
     and $-16, %esp
 
-    # 3. Call your C kernel main function
+    # 3. Pass the multiboot magic (eax) and info pointer (ebx) to kernel_main(magic, mbi).
+    #    sub 8 + two pushes = 16 bytes, so the stack stays 16-byte aligned at the call.
+    sub $8, %esp
+    push %ebx
+    push %eax
     call kernel_main
 
     # 4. If kernel_main ever returns, loop forever
@@ -37,3 +41,5 @@ _start:
     cli
     hlt
     jmp .hang
+
+.section .note.GNU-stack,"",@progbits

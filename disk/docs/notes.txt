@@ -1,0 +1,3 @@
+Notes
+-----
+Next steps for IronOS: writing files, then a text editor, then networking.
