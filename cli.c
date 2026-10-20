@@ -597,6 +597,7 @@ static void run_command(void) {
         say("Disks   : disks mount [n] [rw]  diskinfo  df");
         say("Files   : ls cd pwd cat hexdump edit touch mkdir rm rmdir cp mv echo");
         say("Tips    : \"quote\" names with spaces; echo hi > file; PgUp/PgDn scroll.");
+        say("Install : install <disk-name> (BIOS/legacy, erases target disk)");
         say("Disks start read-only. The prompt shows '#' once writing is enabled.");
     }
     else if (strcmp(cmd, "clear") == 0)  clear_screen();
@@ -618,6 +619,9 @@ static void run_command(void) {
     else if (strcmp(cmd, "cpuinfo") == 0)  hw_cpuinfo();
     else if (strcmp(cmd, "lspci") == 0)    hw_lspci();
     else if (strcmp(cmd, "disks") == 0)    cmd_disks();
+    else if (strcmp(cmd, "install") == 0) {
+        if (installer_command(arg)) { cur_vol = -1; disk_scan(); }
+    }
     else if (strcmp(cmd, "mount") == 0)    cmd_mount(arg);
     else if (strcmp(cmd, "diskinfo") == 0) cmd_diskinfo();
     else if (strcmp(cmd, "df") == 0)       cmd_df();

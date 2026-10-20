@@ -99,6 +99,13 @@ unsigned int pmm_init(unsigned int mbi) {
     reserve_range(mbi, sizeof(struct multiboot_info));
     if (mb->flags & (1 << 6)) reserve_range(mb->mmap_addr, mb->mmap_length);
 
+    // GRUB modules (including the live installation payload) must outlive heap allocation.
+    if ((mb->flags & (1 << 3)) && mb->mods_count <= 32) {
+        unsigned int *mod = (unsigned int *)mb->mods_addr;
+        reserve_range(mb->mods_addr, mb->mods_count * 16);
+        for (unsigned int i = 0; i < mb->mods_count; i++, mod += 4)
+            if (mod[1] > mod[0]) reserve_range(mod[0], mod[1] - mod[0]);
+    }
     return total_pages;
 }
 

@@ -215,6 +215,10 @@ int volume_count(void);
 const struct volume *volume_get(int index);
 const char *ptype_name(unsigned char type);
 
+// install.c
+void installer_init(unsigned int magic, unsigned int mbi);
+int installer_command(const char *arg);
+
 // editor.c
 int editor_run(const char *path);    // full-screen text editor; returns 0, or a negative FAT error
 

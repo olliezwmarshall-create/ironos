@@ -40,3 +40,8 @@ Run it after editing files in QEMU to confirm the image is healthy.
 - Partition tables: bare FAT, MBR (primary + extended/logical), GPT (CRC checked, backup header fallback).
 - Limits: 2 TB per disk, 4Kn disks and USB storage are not supported, wireless/USB/RAID-mode (Intel RST) controllers are not supported.
 - Verified only against emulated controllers on a host PC, never booted on real hardware. Report problems!
+
+## Installing from the live system
+
+See [INSTALL.md](INSTALL.md) for the BIOS/legacy installer, disk erase confirmation,
+WSL `make run` workflow, and booting the installed system with `make run-installed`.

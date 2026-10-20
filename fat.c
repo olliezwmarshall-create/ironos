@@ -34,6 +34,14 @@ static unsigned char fat_buf[512];
 static unsigned int fat_lba = NO_SECTOR;
 static const unsigned char zero_sec[512];
 
+void fat_unmount(void) {
+    mounted = writable = 0;
+    status = "not mounted";
+    sec_lba = fat_lba = NO_SECTOR;
+    cwd_cluster = 0;
+    cwd_path[0] = '/'; cwd_path[1] = 0;
+}
+
 static unsigned int rd16(const unsigned char *p) { return p[0] | (p[1] << 8); }
 static unsigned int rd32(const unsigned char *p) {
     return p[0] | (p[1] << 8) | (p[2] << 16) | ((unsigned int)p[3] << 24);

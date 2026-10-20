@@ -21,6 +21,7 @@ void kernel_main(unsigned int magic, unsigned int mbi) {
     unsigned int usable_pages = 0;
     if (magic == 0x2BADB002)
         usable_pages = pmm_init(mbi);
+    installer_init(magic, mbi);
     heap_init();
 
     ata_init();      // find disks: IDE, then SATA (AHCI), then NVMe; then their partitions.

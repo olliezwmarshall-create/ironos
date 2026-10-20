@@ -47,6 +47,7 @@ typedef void (*fat_list_cb)(const struct fat_dirent *entry, void *ctx);
 
 int fat_is_bpb(const unsigned char *sector);           // does this 512-byte sector look like a FAT boot sector?
 int fat_mount(int drive, unsigned int start_lba, unsigned int vol_sectors, int want_write);   // 0 on success
+void fat_unmount(void);
 int fat_mounted(void);
 int fat_writable(void);
 const char *fat_status(void);                          // human-readable result of the last mount
