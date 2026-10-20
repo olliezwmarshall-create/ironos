@@ -25,3 +25,11 @@ Validation: `make test-desktop` runs a disposable QEMU VM and exercises the
 launcher, system panel, file previews, directory navigation, working-directory
 restoration, terminal return and the existing kernel memory test. Requires
 native Linux QEMU, just like `make test-install`.
+
+## Terminal command history
+
+In the terminal, Up/Down recalls the last 32 nonempty commands; consecutive
+duplicates are stored once. Down past the newest entry restores the input
+you were typing. Recalled commands can be edited before pressing Enter.
+History lasts until reboot. PgUp/PgDn still scroll terminal output.
+Run `make test-history` for the QEMU regression test.

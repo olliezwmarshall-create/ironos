@@ -597,6 +597,7 @@ static void run_command(void) {
         say("Disks   : disks mount [n] [rw]  diskinfo  df");
         say("Files   : ls cd pwd cat hexdump edit touch mkdir rm rmdir cp mv echo");
         say("Tips    : \"quote\" names with spaces; echo hi > file; PgUp/PgDn scroll.");
+        say("History : Up/Down recall commands (32 entries, kept until reboot)");
         say("Desktop : desktop (launcher, files, system information)");
         say("Install : install <disk-name> (BIOS/legacy, erases target disk)");
         say("Disks start read-only. The prompt shows '#' once writing is enabled.");
@@ -654,6 +655,56 @@ static void scroll_view(int lines) {
     render_screen();
 }
 
+#define HISTORY_SIZE 32
+static char command_history[HISTORY_SIZE][80];
+static char history_draft[80];
+static int history_count, history_next, history_position;
+
+static void remember_command(void) {
+    if (!buf_index) return;
+    int last = (history_next + HISTORY_SIZE - 1) % HISTORY_SIZE;
+    if (history_count && !strcmp(command_history[last], cmd_buffer)) return;
+    memcpy(command_history[history_next], cmd_buffer, buf_index + 1);
+    history_next = (history_next + 1) % HISTORY_SIZE;
+    if (history_count < HISTORY_SIZE) history_count++;
+}
+
+/* Replace only the input, including wrapped lines; preserve the prompt/history. */
+static void replace_input(const char *input) {
+    int start = cursor_row * VGA_WIDTH + cursor_col - buf_index;
+    for (int i = 0; i < buf_index; i++) {
+        int at = start + i;
+        terminal_history[at / VGA_WIDTH][at % VGA_WIDTH] = 0;
+    }
+    cursor_row = start / VGA_WIDTH; cursor_col = start % VGA_WIDTH;
+    buf_index = strlen(input);
+    memcpy(cmd_buffer, input, buf_index + 1);
+    print_string(cmd_buffer);
+    if (cursor_row > bottom_rendered_line) {
+        bottom_rendered_line = cursor_row;
+        top_rendered_line = bottom_rendered_line - 24;
+    }
+    render_screen();
+    vga_set_cursor(cursor_row - top_rendered_line, cursor_col);
+}
+
+static void recall_command(int older) {
+    if (!history_count) return;
+    if (older) {
+        if (history_position == history_count) return;
+        if (!history_position) {
+            cmd_buffer[buf_index] = 0;
+            memcpy(history_draft, cmd_buffer, buf_index + 1);
+        }
+        history_position++;
+    } else {
+        if (!history_position) return;
+        history_position--;
+    }
+    int index = (history_next + HISTORY_SIZE - history_position) % HISTORY_SIZE;
+    replace_input(history_position ? command_history[index] : history_draft);
+}
+
 void Cli() {
     while (1) {
         int key = keyboard_getchar();
@@ -663,12 +714,14 @@ void Cli() {
             continue;
         }
 
-        if (key == KEY_UP)        scroll_view(-1);
-        else if (key == KEY_DOWN) scroll_view(1);
+        if (key == KEY_UP)        recall_command(1);
+        else if (key == KEY_DOWN) recall_command(0);
         else if (key == KEY_PGUP) scroll_view(-12);
         else if (key == KEY_PGDN) scroll_view(12);
         else if (key == '\n') {
             cmd_buffer[buf_index] = '\0';
+            remember_command();
+            history_position = 0;
             newline();
             run_command();
             buf_index = 0;
@@ -676,15 +729,16 @@ void Cli() {
         }
         else if (key == '\b') {
             if (buf_index > 0) {
-                buf_index--;
-                if (cursor_col > 0) {
-                    cursor_col--;
-                    print_char(' ');
-                    cursor_col--;
-                }
+                cmd_buffer[buf_index - 1] = 0;
+                // Use a separate copy: replace_input also updates cmd_buffer.
+                char edited[80];
+                memcpy(edited, cmd_buffer, buf_index);
+                replace_input(edited);
+                history_position = 0;
             }
         }
         else if (key >= ' ' && key < 0x7F && buf_index < 79) {
+            history_position = 0;
             cmd_buffer[buf_index++] = (char)key;
             print_char((char)key);
         }
