@@ -36,6 +36,8 @@ void kernel_main(unsigned int magic, unsigned int mbi) {
         newline();
     }
     print_disk_summary();
+    print_string("Type desktop for the desktop, or help for commands.");
+    newline();
     print_prompt();
 
     sti();   // interrupts on: timer + keyboard start firing

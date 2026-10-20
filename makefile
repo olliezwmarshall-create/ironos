@@ -78,10 +78,13 @@ run-installed: $(INSTALL_DISK)
 test-install: $(ISO)
 	$(PYTHON) tools/test_install.py --qemu "$(QEMU)"
 
+test-desktop: $(ISO)
+	$(PYTHON) tools/test_desktop.py --qemu "$(QEMU)"
+
 test-installer-host:
 	@set -e; test_bin=$$(mktemp /tmp/ironos-installer-test.XXXXXX); trap 'rm -f "$$test_bin"' EXIT; $(CC) -std=gnu99 -Wall -Wextra -fno-builtin -DHOST_TEST tools/test_installer.c -o "$$test_bin"; "$$test_bin"
 
-.PHONY: all run run-installed clean disk test-install test-installer-host
+.PHONY: all run run-installed clean disk test-install test-installer-host test-desktop
 
 clean:
 	rm -rf *.o $(KERNEL) $(ISO) iso build/install.img

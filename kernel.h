@@ -219,6 +219,9 @@ const char *ptype_name(unsigned char type);
 void installer_init(unsigned int magic, unsigned int mbi);
 int installer_command(const char *arg);
 
+// desktop.c
+void desktop_run(void);
+
 // editor.c
 int editor_run(const char *path);    // full-screen text editor; returns 0, or a negative FAT error
 
