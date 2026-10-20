@@ -7,7 +7,9 @@ host dependencies. It works in both the live and installed OS.
 - **H**: home/launcher.
 - **F**: files on the currently mounted FAT volume. Up/Down selects an entry;
   Enter opens a directory or a text preview; Backspace opens the parent.
+  PgUp/PgDn jumps by 16 entries; Home/End selects the first/last entry.
   Long names are supported. Up to 128 entries are shown per directory.
+- **G**: launch the 3D demo; Escape returns to the desktop.
 - **S**: total/free physical memory, disk and volume counts, mount status.
 - **Tab**: cycle Home, Files and System.
 - **T**, **Q**, or **Escape**: return to the terminal. In a file preview,
@@ -33,3 +35,5 @@ duplicates are stored once. Down past the newest entry restores the input
 you were typing. Recalled commands can be edited before pressing Enter.
 History lasts until reboot. PgUp/PgDn still scroll terminal output.
 Run `make test-history` for the QEMU regression test.
+
+Terminal output now rolls over safely after 1000 lines, retaining recent output.

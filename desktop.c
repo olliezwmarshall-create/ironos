@@ -92,8 +92,8 @@ static void draw(void) {
     char num[16]; int_to_string(uptime_ticks / TIMER_HZ, num);
     text(54, 0, "Uptime", 7, 0x3F); text(62, 0, num, 12, 0x3F);
     text(2, 2, "APPLICATIONS", 18, 0x1B);
-    const char *apps[] = { "[H] Home", "[F] Files", "[S] System", "[T] Terminal" };
-    for (int i = 0; i < 4; i++) {
+    const char *apps[] = { "[H] Home", "[F] Files", "[S] System", "[G] 3D Demo", "[T] Terminal" };
+    for (int i = 0; i < 5; i++) {
         unsigned char color = i == view ? 0x30 : 0x1F;
         fill(1, 4 + i * 2, 20, 1, color);
         text(2, 4 + i * 2, apps[i], 18, color);
@@ -106,6 +106,7 @@ static void draw(void) {
         text(24, 9, "F  Browse directories and preview files", 53, 0x1F);
         text(24, 11, "S  See memory, storage and uptime", 53, 0x1F);
         text(24, 13, "T  Return to the command terminal", 53, 0x1F);
+        text(24, 15, "G  Launch the first-person 3D demo", 53, 0x1F);
         text(24, 17, "Keyboard controlled | VGA text mode", 53, 0x1B);
     } else if (view == 2) {
         number(24, 6, "Memory total: ", pmm_total_pages() / 256, " MiB");
@@ -130,7 +131,7 @@ static void draw(void) {
     if (notice && view == 1) text(24, 22, notice, 53, 0x1E);
     fill(0, 24, 80, 1, 0x30);
     text(1, 24, view == 1 ? "H Home | S System | T Terminal | Arrows/Enter Open | Backspace Up | Esc Back" :
-         "H Home | F Files | S System | T Terminal | Tab Next | Esc Terminal", 78, 0x3F);
+         "H Home | F Files | S System | G 3D Demo | T Terminal | Esc Exit", 78, 0x3F);
     vga_set_cursor(25, 0);
 }
 void desktop_run(void) {
@@ -148,6 +149,7 @@ void desktop_run(void) {
         }
         if (key == 't' || key == 'T' || key == 'q' || (key == 27 && !previewing)) break;
         if (key == 27) { previewing = 0; notice = 0; }
+        else if (key == 'g' || key == 'G') { graphics_demo(); }
         else if (key == 'h' || key == 'H') view = 0;
         else if (key == 'f' || key == 'F') { view = 1; list(); }
         else if (key == 's' || key == 'S') view = 2;
@@ -158,6 +160,10 @@ void desktop_run(void) {
         } else if (view == 1) {
             if (key == KEY_DOWN && selected + 1 < count) selected++;
             if (key == KEY_UP && selected) selected--;
+            if (key == KEY_HOME) selected = 0;
+            if (key == KEY_END && count) selected = count - 1;
+            if (key == KEY_PGUP) selected = selected > 16 ? selected - 16 : 0;
+            if (key == KEY_PGDN && count) selected = selected + 16 < count ? selected + 16 : count - 1;
             if (key == '\n') file_open();
             if (key == '\b' && fat_mounted()) {
                 if (fat_chdir("..")) notice = "Cannot open parent directory."; else list();

@@ -8,7 +8,9 @@ Run `make run`, then type `demo3d` in IronOS.
 
 This is a real-time software raycaster with a 320x200, 256-colour VGA
 framebuffer, a RAM back buffer, fixed-point camera/projection, wall collision,
-a minimap and a crosshair. Input tracks key presses and releases so movement
+a directional minimap and a crosshair. Brick patterns, distance/side shading,
+coordinated colours and an on-screen control legend improve readability.
+Diagonal movement is normalized to avoid a speed boost. Input tracks key presses and releases so movement
 continues while a key is held. Rendering targets roughly 33 frames/sec on the
 100 Hz timer; frame timing compensates for moderate slowdowns. It is a graphics
 prototype running inside the kernel, not a separate game process. Requires

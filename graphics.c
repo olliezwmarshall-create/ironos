@@ -64,10 +64,18 @@ static int free_at(int x, int y) {
             if (wall((x + dx) / 1024, (y + dy) / 1024)) return 0;
     return 1;
 }
+static void label(int x, int y, const char *s) {
+    for (; *s && x <= 312; s++, x += 8)
+        for (int row = 0; row < 8; row++) {
+            unsigned char bits = saved_font[(unsigned char)*s * 32 + row * 2];
+            for (int col = 0; col < 8; col++)
+                pixels[(y + row) * 320 + x + col] = bits & (0x80 >> col) ? 255 : 0;
+        }
+}
 static void frame(int px, int py, unsigned int angle) {
     int dirx = sine[(angle + 64) & 255], diry = sine[angle];
-    memset(pixels, 18, 320 * 100);
-    memset(pixels + 320 * 100, 22, 320 * 100);
+    for (int y = 0; y < 200; y++)
+        memset(pixels + y * 320, y < 100 ? 1 + y / 8 : 16 + (y - 100) / 7, 320);
     for (int x = 0; x < 320; x++) {
         int camera = (2 * x - 320) * 676 / 320;
         int rx = dirx - diry * camera / 1024, ry = diry + dirx * camera / 1024;
@@ -90,8 +98,17 @@ static void frame(int px, int py, unsigned int angle) {
         int top = (200 - height) / 2, bottom = (200 + height) / 2;
         if (top < 0) top = 0;
         if (bottom > 200) bottom = 200;
-        unsigned char color = 32 + hit * 32 + (side ? 10 : 22);
-        for (int y = top; y < bottom; y++) pixels[y * 320 + x] = color;
+        int shade = 15 - distance / 2048 - side * 3;
+        if (shade < 3) shade = 3;
+        int along = side ? px + rx * distance / 1024 : py + ry * distance / 1024;
+        int u = (along & 1023) / 32;
+        int texstep = 64 * 65536 / height;
+        int texpos = (top - (200 - height) / 2) * texstep;
+        for (int y = top; y < bottom; y++, texpos += texstep) {
+            int v = texpos >> 16;
+            int mortar = !(v & 15) || !((u + ((v >> 4) & 1) * 8) & 15);
+            pixels[y * 320 + x] = hit * 32 + (mortar ? 1 : shade);
+        }
     }
     // Small top-down map and a center crosshair; walls match collision geometry.
     for (int y = 0; y < 12; y++) for (int x = 0; x < 12; x++)
@@ -99,6 +116,10 @@ static void frame(int px, int py, unsigned int angle) {
             pixels[(y * 3 + j + 4) * 320 + x * 3 + i + 4] = wall(x, y) ? 240 : 8;
     pixels[(py * 3 / 1024 + 4) * 320 + px * 3 / 1024 + 4] = 255;
     for (int i = -3; i <= 3; i++) { pixels[100 * 320 + 160 + i] = 255; pixels[(100 + i) * 320 + 160] = 255; }
+    int mapx = px * 3 / 1024 + 4, mapy = py * 3 / 1024 + 4;
+    pixels[(mapy + diry * 2 / 1024) * 320 + mapx + dirx * 2 / 1024] = 255;
+    label(152, 4, "IRONOS | CPU 3D");
+    label(8, 188, "W/S MOVE A/D TURN Q/E STRAFE ESC EXIT");
     volatile unsigned char *vga = (volatile unsigned char *)0xA0000;
     for (int i = 0; i < 64000; i++) vga[i] = pixels[i];
 }
@@ -115,9 +136,18 @@ void graphics_demo(void) {
     write_regs(mode13);
     outb(0x3C8, 0);
     for (int i = 0; i < 256; i++) {
-        outb(0x3C9, ((i >> 5) & 7) * 9);
-        outb(0x3C9, ((i >> 2) & 7) * 9);
-        outb(0x3C9, (i & 3) * 21);
+        int r, g, b;
+        if (i < 16) { r = 5 + i; g = 12 + i; b = 24 + i; }
+        else if (i < 32) { r = 10 + (i - 16); g = 12 + (i - 16); b = 14 + (i - 16); }
+        else if (i < 160) {
+            static const unsigned char hues[4][3] = {{52,30,20},{24,42,54},{26,44,26},{54,46,26}};
+            int material = i / 32 - 1, light = (i & 31) + 8;
+            if (light > 24) light = 24;
+            r = hues[material][0] * light / 24;
+            g = hues[material][1] * light / 24;
+            b = hues[material][2] * light / 24;
+        } else { r = g = b = i == 255 ? 63 : 42; }
+        outb(0x3C9, r); outb(0x3C9, g); outb(0x3C9, b);
     }
     int px = 2560, py = 5632;
     unsigned int angle = 0;
@@ -138,6 +168,7 @@ void graphics_demo(void) {
         forward -= keyboard_key_down('s');
         int strafe = keyboard_key_down('e') - keyboard_key_down('q');
         int dx = sine[(angle + 64) & 255], dy = sine[angle];
+        if (forward && strafe) { dx = dx * 707 / 1000; dy = dy * 707 / 1000; }
         int nx = px + (dx * forward - dy * strafe) * (int)elapsed / 40;
         int ny = py + (dy * forward + dx * strafe) * (int)elapsed / 40;
         if (free_at(nx, py)) px = nx;

@@ -34,7 +34,7 @@ void print_banner() {
 }
 void clear_screen() {
     // 1. Clear the physical VGA screen buffer
-    volatile unsigned char *vga = (unsigned char *) VGA_ADDRESS;
+    volatile unsigned char *vga = VGA_MEM;
     for (int i = 0; i < 4000; i += 2) {
         vga[i] = ' ';
         vga[i+1] = current_color;
@@ -56,54 +56,39 @@ void clear_screen() {
         }
     }
 }
-void print_char(char c) {
-    // 1. Save character to history buffer (with safety boundary check)
-    if (cursor_row < MAX_HISTORY_LINES) {
-        terminal_history[cursor_row][cursor_col] = c;
-    }
-
-    // 2. Advance column and handle line wrapping
-    cursor_col++;
-    if (cursor_col >= 80) {
-        cursor_col = 0;
-        // Only increment row if we haven't hit the absolute history ceiling
-        if (cursor_row < MAX_HISTORY_LINES - 1) {
-            cursor_row++;
-        }
-    }
-
-    // 3. Track total lines written (capped at history limit)
-    if (cursor_row > total_lines_written && cursor_row < MAX_HISTORY_LINES) {
-        total_lines_written = cursor_row;
-    }
-
-    // 4. Auto-follow: if we are at the bottom, push the viewport down
+// Retain the latest 1000 lines without writing beyond the history buffer.
+static void advance_line(void) {
+    cursor_col = 0;
+    if (cursor_row + 1 >= MAX_HISTORY_LINES) {
+        memmove(terminal_history, terminal_history + 1, (MAX_HISTORY_LINES - 1) * VGA_WIDTH);
+        memset(terminal_history[MAX_HISTORY_LINES - 1], 0, VGA_WIDTH);
+        if (top_rendered_line > 0) top_rendered_line--;
+        if (bottom_rendered_line > 0) bottom_rendered_line--;
+        if (total_lines_written > 0) total_lines_written--;
+    } else cursor_row++;
+    if (cursor_row > total_lines_written) total_lines_written = cursor_row;
     if (cursor_row > bottom_rendered_line) {
-        top_rendered_line++;
-        bottom_rendered_line++;
+        bottom_rendered_line = cursor_row;
+        top_rendered_line = bottom_rendered_line - 24;
     }
-
-    // 5. Redraw the screen so changes show up instantly
+}
+void print_char(char c) {
+    if (cursor_row >= 0 && cursor_row < MAX_HISTORY_LINES)
+        terminal_history[cursor_row][cursor_col] = c;
+    if (++cursor_col >= VGA_WIDTH) advance_line();
+    if (cursor_row > total_lines_written) total_lines_written = cursor_row;
+    if (cursor_row > bottom_rendered_line) {
+        bottom_rendered_line = cursor_row;
+        top_rendered_line = bottom_rendered_line - 24;
+    }
     if (!batch_depth) render_screen();
 }
-
-void newline() {
-    cursor_col = 0;
-    cursor_row++;
-    
-    if (cursor_row > total_lines_written) {
-        total_lines_written = cursor_row;
-    }
-
-    if (cursor_row > bottom_rendered_line) {
-        top_rendered_line++;
-        bottom_rendered_line++;
-    }
-
+void newline(void) {
+    advance_line();
     if (!batch_depth) render_screen();
 }
 void render_screen() {
-    unsigned char *vga = (unsigned char *) 0xB8000;
+    unsigned char *vga = VGA_MEM;
     
     // Loop through the 25 rows of the physical screen
     for (int row = 0; row < 25; row++) {
@@ -114,7 +99,7 @@ void render_screen() {
             int vga_offset = (row * 80 + col) * 2;
             
             // If the history line exists, print its characters; otherwise print blank spaces
-            if (history_row <= total_lines_written) {
+            if (history_row >= 0 && history_row < MAX_HISTORY_LINES && history_row <= total_lines_written) {
                 char c = terminal_history[history_row][col];
                 // If it's a null terminator, just print a space
                 vga[vga_offset] = (c != '\0') ? c : ' ';
