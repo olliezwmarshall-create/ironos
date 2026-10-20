@@ -21,6 +21,7 @@ static const unsigned char keymap_shift[0x3A] = {
 static volatile int kb_buf[KB_BUF_SIZE];
 static volatile int kb_head = 0;   // written by the IRQ
 static volatile int kb_tail = 0;   // written by the reader
+static volatile unsigned char key_state[128];
 static int shift_down = 0, caps_on = 0, ctrl_down = 0, extended = 0;
 
 static void kb_push(int key) {
@@ -39,6 +40,7 @@ static void keyboard_callback(struct registers *r) {
 
     int released = sc & 0x80;
     sc &= 0x7F;
+    if (!extended) key_state[sc] = !released;
 
     if (extended) {                 // arrow keys etc. arrive as E0 xx
         extended = 0;
@@ -82,4 +84,10 @@ int keyboard_getchar(void) {
     int key = kb_buf[kb_tail];
     kb_tail = (kb_tail + 1) % KB_BUF_SIZE;
     return key;
+}
+
+int keyboard_key_down(int key) {
+    for (unsigned int i = 1; i < sizeof(keymap); i++)
+        if (keymap[i] == key) return key_state[i];
+    return 0;
 }

@@ -598,10 +598,12 @@ static void run_command(void) {
         say("Files   : ls cd pwd cat hexdump edit touch mkdir rm rmdir cp mv echo");
         say("Tips    : \"quote\" names with spaces; echo hi > file; PgUp/PgDn scroll.");
         say("History : Up/Down recall commands (32 entries, kept until reboot)");
+        say("Graphics: demo3d (software 3D, WASD movement, Esc exits)");
         say("Desktop : desktop (launcher, files, system information)");
         say("Install : install <disk-name> (BIOS/legacy, erases target disk)");
         say("Disks start read-only. The prompt shows '#' once writing is enabled.");
     }
+    else if (strcmp(cmd, "demo3d") == 0) graphics_demo();
     else if (strcmp(cmd, "desktop") == 0) desktop_run();
     else if (strcmp(cmd, "clear") == 0)  clear_screen();
     else if (strcmp(cmd, "hello") == 0)  say("Hello from your custom kernel!");

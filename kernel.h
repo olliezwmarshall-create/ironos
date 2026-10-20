@@ -164,6 +164,8 @@ void timer_init(unsigned int hz);
 
 // keyboard.c
 void keyboard_init(void);
+int keyboard_key_down(int key);   // held ASCII key (lowercase), independent of repeat
+void graphics_demo(void);
 int keyboard_getchar(void);   // returns -1 if no key is waiting
 
 // pmm.c - physical page allocator (1 page = 4096 bytes; no paging yet, so physical == virtual)
