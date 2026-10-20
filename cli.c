@@ -600,13 +600,14 @@ static void run_command(void) {
         say("History : Up/Down recall commands (32 entries, kept until reboot)");
         say("Network : net  dhcp  ping <IPv4-or-host>  resolve <host>");
         say("Graphics: demo3d (software 3D, WASD movement, Esc exits)");
-        say("Desktop : desktop (launcher, files, system information)");
+        say("Desktop : desktop (graphical + mouse)  textdesk (text mode)");
         say("Install : install <disk-name> (BIOS/legacy, erases target disk)");
         say("Disks start read-only. The prompt shows '#' once writing is enabled.");
     }
     else if (!strcmp(cmd, "net") || !strcmp(cmd, "dhcp") || !strcmp(cmd, "ping") || !strcmp(cmd, "resolve")) net_command(cmd, arg);
     else if (strcmp(cmd, "demo3d") == 0) graphics_demo();
-    else if (strcmp(cmd, "desktop") == 0) desktop_run();
+    else if (!strcmp(cmd, "desktop") || !strcmp(cmd, "gui")) gui_run();
+    else if (!strcmp(cmd, "textdesk")) desktop_run();
     else if (strcmp(cmd, "clear") == 0)  clear_screen();
     else if (strcmp(cmd, "hello") == 0)  say("Hello from your custom kernel!");
     else if (strcmp(cmd, "color") == 0) {

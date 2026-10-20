@@ -119,13 +119,11 @@ static void frame(int px, int py, unsigned int angle) {
     int mapx = px * 3 / 1024 + 4, mapy = py * 3 / 1024 + 4;
     pixels[(mapy + diry * 2 / 1024) * 320 + mapx + dirx * 2 / 1024] = 255;
     label(152, 4, "IRONOS | CPU 3D");
-    label(8, 188, "W/S MOVE A/D TURN Q/E STRAFE ESC EXIT");
+    label(8, 188, "W/S MOVE | MOUSE/A/D TURN | ESC EXIT");
     volatile unsigned char *vga = (volatile unsigned char *)0xA0000;
     for (int i = 0; i < 64000; i++) vga[i] = pixels[i];
 }
-void graphics_demo(void) {
-    print_string("3D demo: W/S move, A/D turn, Q/E strafe. Esc exits."); newline();
-    print_string("Standard VGA required. Software rendering; no GPU acceleration."); newline();
+void graphics_begin(void) {
     memcpy(text_screen, (const void *)VGA_ADDRESS, 4000);
     read_regs(saved_regs);
     outb(0x3C7, 0);
@@ -137,7 +135,12 @@ void graphics_demo(void) {
     outb(0x3C8, 0);
     for (int i = 0; i < 256; i++) {
         int r, g, b;
-        if (i < 16) { r = 5 + i; g = 12 + i; b = 24 + i; }
+        static const unsigned char ui[][3] = {
+            {5,8,15},{9,14,23},{12,27,37},{12,20,31},{18,35,46},
+            {15,45,37},{25,33,43},{40,46,53},{62,62,62},{62,44,16},{0,0,0}
+        };
+        if (i >= 224 && i < 224 + (int)(sizeof(ui)/sizeof(ui[0]))) { r=ui[i-224][0]; g=ui[i-224][1]; b=ui[i-224][2]; }
+        else if (i < 16) { r = 5 + i; g = 12 + i; b = 24 + i; }
         else if (i < 32) { r = 10 + (i - 16); g = 12 + (i - 16); b = 14 + (i - 16); }
         else if (i < 160) {
             static const unsigned char hues[4][3] = {{52,30,20},{24,42,54},{26,44,26},{54,46,26}};
@@ -149,12 +152,60 @@ void graphics_demo(void) {
         } else { r = g = b = i == 255 ? 63 : 42; }
         outb(0x3C9, r); outb(0x3C9, g); outb(0x3C9, b);
     }
+}
+void graphics_end(void) {
+    volatile unsigned char *vga = (volatile unsigned char *)0xA0000;
+    // Establish text mode before loading its font, then restore plane/odd-even state.
+    write_regs(saved_regs);
+    font_plane();
+    for (int i = 0; i < 65536; i++) vga[i] = saved_font[i];
+    write_regs(saved_regs);
+    outb(0x3C8, 0);
+    for (int i = 0; i < 768; i++) outb(0x3C9, saved_palette[i]);
+    memcpy((void *)VGA_ADDRESS, text_screen, 4000);
+    render_screen();
+}
+
+void graphics_rect(int x, int y, int width, int height, unsigned char color) {
+    if (width <= 0 || height <= 0 || x >= 320 || y >= 200) return;
+    if (x < 0) { width += x; x = 0; }
+    if (y < 0) { height += y; y = 0; }
+    if (width <= 0 || height <= 0) return;
+    if (width > 320-x) width=320-x;
+    if (height > 200-y) height=200-y;
+    for (int row=y; row<y+height; row++)
+        for (int col=x; col<x+width; col++) pixels[row*320+col]=color;
+}
+void graphics_text(int x, int y, const char *s, unsigned char color, int max) {
+    for (int i=0; i<max && s[i]; i++, x+=8) {
+        unsigned char c = s[i];
+        if (c < 32 || c > 126) c = '.';
+        for (int row=0; row<8; row++) {
+            unsigned char bits = saved_font[c*32+row*2] | saved_font[c*32+row*2+1];
+            for (int col=0; col<8; col++)
+                if ((bits & (0x80 >> col)) && x+col>=0 && x+col<320 && y+row>=0 && y+row<200)
+                    pixels[(y+row)*320+x+col]=color;
+        }
+    }
+}
+void graphics_present(void) {
+    volatile unsigned char *vga = (volatile unsigned char *)0xA0000;
+    for (int i=0; i<64000; i++) vga[i]=pixels[i];
+}
+void graphics_demo(void) {
+    print_string("3D demo: W/S move, A/D or mouse turn, Q/E strafe. Esc exits."); newline();
+    print_string("Standard VGA required. Software rendering; no GPU acceleration."); newline();
+    struct mouse_event discard;
+    while (mouse_get_event(&discard)) {}
+    graphics_begin();
     int px = 2560, py = 5632;
     unsigned int angle = 0;
     unsigned long last = uptime_ticks;
     frame(px, py, angle);
     for (;;) {
         net_poll();
+        struct mouse_event movement;
+        while (mouse_get_event(&movement)) angle = (angle + movement.dx) & 255;
         int k = keyboard_getchar();
         if (k == 27) break;
         unsigned long now = uptime_ticks;
@@ -176,12 +227,6 @@ void graphics_demo(void) {
         if (free_at(px, ny)) py = ny;
         frame(px, py, angle);
     }
-    font_plane();
-    for (int i = 0; i < 65536; i++) vga[i] = saved_font[i];
-    write_regs(saved_regs);
-    outb(0x3C8, 0);
-    for (int i = 0; i < 768; i++) outb(0x3C9, saved_palette[i]);
-    memcpy((void *)VGA_ADDRESS, text_screen, 4000);
-    render_screen();
+    graphics_end();
     print_string("3D demo closed."); newline();
 }

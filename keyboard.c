@@ -32,9 +32,7 @@ static void kb_push(int key) {
     }
 }
 
-static void keyboard_callback(struct registers *r) {
-    (void)r;
-    unsigned char sc = inb(0x60);
+void keyboard_receive_byte(unsigned char sc) {
 
     if (sc == 0xE0) { extended = 1; return; }
 
@@ -75,8 +73,19 @@ static void keyboard_callback(struct registers *r) {
     if (c) kb_push(c);
 }
 
+void ps2_irq(struct registers *r) {
+    (void)r;
+    for (int budget = 0; budget < 32; budget++) {
+        unsigned char status = inb(0x64);
+        if (!(status & 1)) break;
+        unsigned char b = inb(0x60);
+        if (status & 0xC0) { if (status & 0x20) mouse_receive_byte(-1); continue; }
+        if (status & 0x20) mouse_receive_byte(b);
+        else keyboard_receive_byte(b);
+    }
+}
 void keyboard_init(void) {
-    register_interrupt_handler(33, keyboard_callback);   // IRQ1
+    register_interrupt_handler(33, ps2_irq);   // IRQ1
 }
 
 int keyboard_getchar(void) {

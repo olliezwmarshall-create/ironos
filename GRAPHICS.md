@@ -3,7 +3,7 @@
 Run `make run`, then type `demo3d` in IronOS.
 
 - Hold **W/S** to move forwards/backwards.
-- Hold **A/D** to turn; **Q/E** strafe.
+- Hold **A/D** or the PS/2 mouse to turn; **Q/E** strafe.
 - **Escape** returns to the terminal and restores VGA text mode and its font.
 
 This is a real-time software raycaster with a 320x200, 256-colour VGA
@@ -33,3 +33,5 @@ compatible application interfaces and libraries. CS2 additionally requires a
 CS 1.6 has lower hardware requirements but still needs those application and
 driver foundations. Supporting a small independent game first is a practical
 way to validate each layer.
+
+The shared VGA backend now also drives the graphical `desktop` shell.

@@ -16,6 +16,7 @@ void kernel_main(unsigned int magic, unsigned int mbi) {
     interrupts_init();
     timer_init(TIMER_HZ);
     keyboard_init();
+    mouse_init();
 
     // 0x2BADB002 means a Multiboot loader (GRUB) gave us a valid info struct
     unsigned int usable_pages = 0;

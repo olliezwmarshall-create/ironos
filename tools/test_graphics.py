@@ -52,7 +52,7 @@ def main():
             vm.expect('3D demo closed.')
             vm.send('cat hello.txt'); vm.expect('Hello from the IronOS disk!')
             vm.send('memtest'); vm.expect('memtest: PASSED')
-            vm.send('desktop'); vm.expect('IronOS Desktop')
+            vm.send('textdesk'); vm.expect('IronOS Desktop')
             vm.hmp('sendkey t'); time.sleep(.2)
             vm.expect('kernel:/$>')
             # Repeat a mode switch to catch damaged register/font restoration.

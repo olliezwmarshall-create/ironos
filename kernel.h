@@ -163,9 +163,23 @@ void register_interrupt_handler(int int_no, irq_handler_t handler);
 void timer_init(unsigned int hz);
 
 // keyboard.c
+struct mouse_event { int x, y, dx, dy; unsigned int buttons, pressed; };
+void mouse_init(void);
+int mouse_present(void);
+void mouse_receive_byte(int value);
+int mouse_get_event(struct mouse_event *event);
+void mouse_get_state(struct mouse_event *event);
+void ps2_irq(struct registers *r);
+void keyboard_receive_byte(unsigned char sc);
 void keyboard_init(void);
 int keyboard_key_down(int key);   // held ASCII key (lowercase), independent of repeat
 void graphics_demo(void);
+void graphics_begin(void);
+void graphics_end(void);
+void graphics_rect(int x, int y, int width, int height, unsigned char color);
+void graphics_text(int x, int y, const char *s, unsigned char color, int max);
+void graphics_present(void);
+void gui_run(void);
 int keyboard_getchar(void);   // returns -1 if no key is waiting
 
 // pmm.c - physical page allocator (1 page = 4096 bytes; no paging yet, so physical == virtual)

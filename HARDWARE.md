@@ -51,3 +51,9 @@ WSL `make run` workflow, and booting the installed system with `make run-install
 PCI RTL8139 Ethernet is supported through its legacy interface. See
 [NETWORK.md](NETWORK.md) for DHCP, DNS, ping, QEMU NAT and current limitations.
 Wi-Fi and USB network adapters still need separate drivers.
+
+## Graphical shell and mouse
+
+`desktop` opens the VGA graphical shell; `textdesk` retains the text interface.
+Standard PS/2 mice are supported. Native USB mice and I2C touchpads are not.
+See [DESKTOP.md](DESKTOP.md) for controls and hardware limitations.

@@ -21,7 +21,7 @@ def main():
         vm = VM(args, work)
         try:
             vm.expect('kernel:/$>')
-            vm.send('desktop')
+            vm.send('textdesk')
             vm.expect('IronOS Desktop')
             vm.hmp('sendkey g'); time.sleep(.5)
             vm.hmp('sendkey esc'); time.sleep(.3)

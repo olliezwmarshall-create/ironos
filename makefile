@@ -83,6 +83,13 @@ test-install: $(ISO)
 test-screen:
 	@set -e; test_bin=$$(mktemp /tmp/ironos-screen-test.XXXXXX); trap 'rm -f "$$test_bin"' EXIT; $(CC) -std=gnu99 -Wall -Wextra -fno-builtin -fsanitize=address -DHOST_TEST tools/test_screen.c -o "$$test_bin"; "$$test_bin"
 
+test-mouse-host:
+	@set -e; test_bin=$$(mktemp /tmp/ironos-mouse-test.XXXXXX); trap 'rm -f "$$test_bin"' EXIT; $(CC) -std=gnu99 -Wall -Wextra -fno-builtin -fsanitize=address,undefined -DHOST_TEST tools/test_mouse.c -o "$$test_bin"; "$$test_bin"
+
+test-gui: $(ISO)
+	$(PYTHON) tools/test_gui.py --qemu "$(QEMU)"
+	$(PYTHON) tools/test_network_fixture.py --qemu "$(QEMU)" --gui
+
 test-network-driver:
 	@set -e; test_bin=$$(mktemp /tmp/ironos-nic-test.XXXXXX); trap 'rm -f "$$test_bin"' EXIT; $(CC) -std=gnu99 -Wall -Wextra -Wno-pointer-to-int-cast -fno-builtin -fsanitize=address,undefined -DHOST_TEST tools/test_rtl8139.c -o "$$test_bin"; "$$test_bin"
 
@@ -105,7 +112,7 @@ test-desktop: $(ISO)
 test-installer-host:
 	@set -e; test_bin=$$(mktemp /tmp/ironos-installer-test.XXXXXX); trap 'rm -f "$$test_bin"' EXIT; $(CC) -std=gnu99 -Wall -Wextra -fno-builtin -DHOST_TEST tools/test_installer.c -o "$$test_bin"; "$$test_bin"
 
-.PHONY: all run run-installed clean disk test-install test-installer-host test-desktop test-history test-graphics test-screen test-network test-network-host test-network-driver
+.PHONY: all run run-installed clean disk test-install test-installer-host test-desktop test-history test-graphics test-screen test-network test-network-host test-network-driver test-gui test-mouse-host
 
 clean:
 	rm -rf *.o $(KERNEL) $(ISO) iso build/install.img
