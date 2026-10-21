@@ -4,6 +4,7 @@
  * All lengths/checksums are checked before accessing received protocol fields.
  */
 static unsigned int address, mask, gateway, dns, lease_end;
+static int manual;
 static unsigned int packets_rx, packets_tx, packets_drop;
 static unsigned char incoming[1536], outgoing[1536];
 static const unsigned char broadcast[6] = {255,255,255,255,255,255};
@@ -69,11 +70,11 @@ static int valid_offer(const struct offer *o) {
     return 1;
 }
 static int send_frame(unsigned int n) {
-    if (rtl8139_send(outgoing, n)) { packets_drop++; return -1; }
+    if (nic_send(outgoing, n)) { packets_drop++; return -1; }
     packets_tx++; return 0;
 }
 static void ethernet(const unsigned char *to, unsigned int type) {
-    memcpy(outgoing, to, 6); memcpy(outgoing + 6, rtl8139_mac(), 6); put16(outgoing + 12, type);
+    memcpy(outgoing, to, 6); memcpy(outgoing + 6, nic_mac(), 6); put16(outgoing + 12, type);
 }
 static unsigned char *ipv4(const unsigned char *to_mac, unsigned int from, unsigned int to,
                             unsigned int protocol, unsigned int length) {
@@ -100,7 +101,7 @@ static void arp_send(const unsigned char *to_mac, unsigned int to_ip, int reply)
     ethernet(to_mac, 0x806);
     unsigned char *p = outgoing + 14;
     put16(p, 1); put16(p + 2, 0x800); p[4] = 6; p[5] = 4; put16(p + 6, reply ? 2 : 1);
-    memcpy(p + 8, rtl8139_mac(), 6); put32(p + 14, address);
+    memcpy(p + 8, nic_mac(), 6); put32(p + 14, address);
     if (reply) memcpy(p + 18, to_mac, 6); else memset(p + 18, 0, 6);
     put32(p + 24, to_ip); send_frame(42);
 }
@@ -117,7 +118,7 @@ static void receive_arp(const unsigned char *p, unsigned int n, const unsigned c
 
 static void receive_dhcp(const unsigned char *p, unsigned int n) {
     if ((dhcp_state != 1 && dhcp_state != 2) || n < 240 || p[0] != 2 || p[1] != 1 || p[2] != 6 ||
-        be32(p + 4) != dhcp_xid || memcmp(p + 28, rtl8139_mac(), 6) || be32(p + 236) != 0x63825363) return;
+        be32(p + 4) != dhcp_xid || memcmp(p + 28, nic_mac(), 6) || be32(p + 236) != 0x63825363) return;
     struct offer o = dhcp_state == 2 ? offer : (struct offer){0};
     o.ip = be32(p + 16);
     unsigned int message = 0, server = 0, seen = 0;
@@ -213,16 +214,16 @@ static void receive_ipv4(const unsigned char *p, unsigned int n, const unsigned 
     }
 }
 static void receive_frame(const unsigned char *p, unsigned int n) {
-    if (n < 14 || (memcmp(p, rtl8139_mac(), 6) && memcmp(p, broadcast, 6))) { packets_drop++; return; }
+    if (n < 14 || (memcmp(p, nic_mac(), 6) && memcmp(p, broadcast, 6))) { packets_drop++; return; }
     unsigned int type = be16(p + 12);
     if (type == 0x806) receive_arp(p + 14, n - 14, p + 6);
     if (type == 0x800) receive_ipv4(p + 14, n - 14, p + 6);
 }
 void net_poll(void) {
-    if (!rtl8139_present()) return;
-    if (address && expired(lease_end)) { address = mask = gateway = dns = neighbor = 0; }
+    if (!nic_present()) return;
+    if (address && !manual && expired(lease_end)) { address = mask = gateway = dns = neighbor = 0; manual=0; }
     for (int budget = 0; budget < 32; budget++) {
-        int n = rtl8139_receive(incoming, sizeof(incoming));
+        int n = nic_receive(incoming, sizeof(incoming));
         if (!n) break;
         if (n < 0) { packets_drop++; break; }
         packets_rx++; receive_frame(incoming, n);
@@ -230,8 +231,8 @@ void net_poll(void) {
 }
 static int ready(void) {
     net_poll();
-    if (!rtl8139_present()) { say("No supported Ethernet card. Currently supported: PCI RTL8139 (10EC:8139)."); return 0; }
-    if (!rtl8139_link()) { say("Ethernet link down. Check the cable or QEMU network setting."); return 0; }
+    if (!nic_present()) { say("No supported Ethernet card. Run netcards for supported devices."); return 0; }
+    if (!nic_link()) { say("Ethernet link down. Check the cable or QEMU network setting."); return 0; }
     return 1;
 }
 static int configured(void) {
@@ -246,7 +247,7 @@ static int resolve_mac(unsigned int target, unsigned char *result) {
     arp_wanted = hop;
     unsigned int start = uptime_ticks, sent = start - TIMER_HZ;
     while (uptime_ticks - start < 3 * TIMER_HZ) {
-        if (!rtl8139_link() || !address) break;
+        if (!nic_link() || !address) break;
         if (uptime_ticks - sent >= TIMER_HZ) { arp_send(broadcast, hop, 0); sent = uptime_ticks; }
         net_poll();
         if (neighbor == hop && !expired(neighbor_until)) { memcpy(result, neighbor_mac, 6); arp_wanted = 0; return 1; }
@@ -258,10 +259,10 @@ static int resolve_mac(unsigned int target, unsigned char *result) {
 static void send_dhcp(int request) {
     unsigned char p[320]; memset(p, 0, sizeof(p));
     p[0] = 1; p[1] = 1; p[2] = 6; put32(p + 4, dhcp_xid); put16(p + 10, 0x8000);
-    memcpy(p + 28, rtl8139_mac(), 6); put32(p + 236, 0x63825363);
+    memcpy(p + 28, nic_mac(), 6); put32(p + 236, 0x63825363);
     unsigned int at = 240;
     p[at++] = 53; p[at++] = 1; p[at++] = request ? 3 : 1;
-    p[at++] = 61; p[at++] = 7; p[at++] = 1; memcpy(p + at, rtl8139_mac(), 6); at += 6;
+    p[at++] = 61; p[at++] = 7; p[at++] = 1; memcpy(p + at, nic_mac(), 6); at += 6;
     p[at++] = 55; p[at++] = 4; p[at++] = 1; p[at++] = 3; p[at++] = 6; p[at++] = 51;
     if (request) {
         p[at++] = 50; p[at++] = 4; put32(p + at, offer.ip); at += 4;
@@ -272,14 +273,14 @@ static void send_dhcp(int request) {
 }
 static void dhcp(void) {
     if (!ready()) return;
-    address = mask = gateway = dns = neighbor = 0;
+    address = mask = gateway = dns = neighbor = 0; manual=0;
     memset(&offer, 0, sizeof(offer));
     dhcp_xid += 0x49524F4E ^ uptime_ticks;
     dhcp_state = 1;
     say("Requesting an IPv4 lease... (Esc cancels)");
     unsigned int start = uptime_ticks, sent = start - 2 * TIMER_HZ;
     int requested = 0;
-    while (uptime_ticks - start < 12 * TIMER_HZ && rtl8139_link()) {
+    while (uptime_ticks - start < 12 * TIMER_HZ && nic_link()) {
         net_poll();
         if (dhcp_state == 3 || dhcp_state == -1) break;
         if (uptime_ticks - sent >= 2 * TIMER_HZ || (dhcp_state == 2 && !requested)) {
@@ -326,7 +327,7 @@ static unsigned int lookup(const char *name) {
     dns_port = 49152 + (dns_serial & 0x3FFF); dns_target = dns;
     dns_answer = 0; dns_error = 0; dns_waiting = 1;
     unsigned int start = uptime_ticks, sent = start - 2 * TIMER_HZ;
-    while (uptime_ticks - start < 6 * TIMER_HZ && dns_waiting && address && rtl8139_link()) {
+    while (uptime_ticks - start < 6 * TIMER_HZ && dns_waiting && address && nic_link()) {
         if (uptime_ticks - sent >= 2 * TIMER_HZ) {
             send_udp(mac, address, dns, dns_port, 53, query, 12 + dns_question_len); sent = uptime_ticks;
         }
@@ -348,7 +349,7 @@ static void ping(const char *arg) {
     if (!resolve_mac(target, mac)) return;
     unsigned int replies = 0;
     print_string("Pinging "); print_ip(target); say(" (3 probes, Esc cancels)");
-    for (int i = 0; i < 3 && address && rtl8139_link(); i++) {
+    for (int i = 0; i < 3 && address && nic_link(); i++) {
         unsigned char *p = ipv4(mac, address, target, 1, 16);
         memset(p, 0, 16); p[0] = 8; put16(p + 4, 0x494F); put16(p + 6, ++ping_serial);
         ping_started = uptime_ticks; put32(p + 8, ping_started); memcpy(p + 12, "IRON", 4);
@@ -356,7 +357,7 @@ static void ping(const char *arg) {
         ping_target = target; ping_waiting = 1; ping_replied = 0;
         if (send_frame(50)) { ping_waiting = 0; say("Transmit failed."); break; }
         int cancelled = 0;
-        while (!ping_replied && uptime_ticks - ping_started < TIMER_HZ && address && rtl8139_link()) {
+        while (!ping_replied && uptime_ticks - ping_started < TIMER_HZ && address && nic_link()) {
             net_poll();
             if (keyboard_getchar() == 27) { cancelled = 1; break; }
             halt();
@@ -372,27 +373,60 @@ static void ping(const char *arg) {
 }
 static void info(void) {
     net_poll();
-    if (!rtl8139_present()) { ready(); return; }
-    say("Ethernet: RTL8139 (PCI 10EC:8139), polled driver");
+    if (!nic_present()) { ready(); return; }
+    print_string("Ethernet: ");say(nic_name());
     print_string("MAC: ");
-    const unsigned char *m = rtl8139_mac();
+    const unsigned char *m = nic_mac();
     for (int i = 0; i < 6; i++) {
         char h[9]; hex_to_string(m[i], h); print_string(h + 6); if (i < 5) print_string(":");
     }
-    newline(); say(rtl8139_link() ? "Link: up" : "Link: down");
+    newline(); say(nic_link() ? "Link: up" : "Link: down");
     if (address) {
         print_string("IPv4: "); print_ip(address); print_string("  Mask: "); print_ip(mask); newline();
         print_string("Gateway: "); print_ip(gateway); print_string("  DNS: "); print_ip(dns); newline();
-        print_string("Lease: "); number((lease_end - uptime_ticks) / TIMER_HZ); say(" seconds left; run dhcp to renew.");
+        if (manual) say("Static IPv4 configuration.");
+        else { print_string("Lease: "); number((lease_end - uptime_ticks) / TIMER_HZ); say(" seconds left; run dhcp to renew."); }
     } else say("IPv4: not configured (run dhcp).");
     print_string("Packets RX/TX/drop: "); number(packets_rx); print_string("/"); number(packets_tx); print_string("/"); number(packets_drop); newline();
 }
 void net_command(const char *cmd, const char *arg) {
     if (!strcmp(cmd, "net") && !*arg) info();
-    else if (!strcmp(cmd, "dhcp") && !*arg) dhcp();
+    else if ((!strcmp(cmd, "dhcp") || !strcmp(cmd, "netauto")) && !*arg) dhcp();
+    else if (!strcmp(cmd,"netcards")) nic_list();
+    else if (!strcmp(cmd,"netoff") && !*arg) {
+        address=mask=gateway=dns=neighbor=0;manual=0;say("IPv4 configuration cleared.");
+    }
+    else if (!strcmp(cmd,"netconfig")) {
+        unsigned int values[4]; const char *at=arg;int ok=1;
+        for (int i=0;i<4;i++) {
+            char part[16];int n=0;
+            while (*at && *at!=' ' && n<15) part[n++]=*at++;
+            part[n]=0;while (*at==' ') at++;
+            if (!parse_ip(part,&values[i])) { ok=0;break; }
+        }
+        struct offer o={0};
+        if (ok && !*at) {
+            o.ip=values[0];o.mask=values[1];o.router=values[2];o.dns=values[3];o.lease=1;
+            ok=valid_offer(&o) && (!o.dns || unicast(o.dns));
+        } else ok=0;
+        if (!ok) say("Usage: netconfig <IPv4> <mask> <gateway-or-0.0.0.0> <DNS-or-0.0.0.0>");
+        else if (ready()) { address=o.ip;mask=o.mask;gateway=o.router;dns=o.dns;neighbor=0;manual=1;say("Static IPv4 configured."); }
+    }
     else if (!strcmp(cmd, "ping") && *arg) ping(arg);
     else if (!strcmp(cmd, "resolve") && *arg) {
         unsigned int ip = lookup(arg);
         if (ip) { print_string(arg); print_string(" = "); print_ip(ip); newline(); }
     } else say("Usage: net | dhcp | ping <IPv4-or-host> | resolve <host>");
+}
+
+void net_get_info(struct net_info *info) {
+    net_poll();*info=(struct net_info){address,mask,gateway,dns,packets_rx,packets_tx,packets_drop,address!=0,manual};
+}
+void net_format_ip(unsigned int ip,char *buf) {
+    for (int shift=24;shift>=0;shift-=8) {
+        char n[16];int_to_string((ip>>shift)&255,n);
+        for (int i=0;n[i];i++) *buf++=n[i];
+        if (shift) *buf++='.';
+    }
+    *buf=0;
 }

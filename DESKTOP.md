@@ -1,64 +1,59 @@
-# Graphical desktop and PS/2 mouse
+# Desktop, windows and apps
 
-Run `make run`, then type `desktop` (or `gui`) in IronOS. The new graphical
-shell uses the existing 320x200 VGA graphics backend, with a software cursor,
-clickable launcher, file browser and system panel. It remains CPU-rendered;
-it does not require a GPU acceleration driver. The older text interface is
-still available with `textdesk`.
+Run `make run`, then enter `desktop` (or `gui`). QEMU standard VGA uses an
+800×600, 32-bit linear framebuffer through Bochs DISPI. Unsupported video
+adapters retain the 320×200 VGA fallback. Drawing runs on the CPU; this does
+not add GPU acceleration. The 3D demo keeps its existing 320×200 renderer.
+`textdesk` remains available.
 
-## Mouse controls
+## Window controls
 
-- Click **Home**, **Files** or **System** in the sidebar to change panels.
-- In Files, click a row to select it, then **Open**, or double-click the row.
-  Folders are marked with `>`. Files open in a read-only text preview.
-- **Up/Back**, **Prev** and **Next** navigate folders/previews and pages.
-  Right-click in Files also goes back/up.
-- **Demo3D** opens the first-person demo. Move the mouse to turn; Escape
-  returns to the graphical shell. WASD and Q/E controls remain available.
-- **Shell** returns to the command terminal. The window's X returns to Home,
-  or to the terminal if Home is already open.
+The top bar opens Home, Files, System, Network, Calc, Clock and Notes. Windows
+stack and receive keyboard focus when clicked. Drag a title bar to move its
+window; `_` minimizes and `X` closes. The bottom taskbar restores open windows.
+Tab switches focus between visible windows. Window positions last until the
+desktop is exited. Apps cooperate in one kernel event loop; this is not
+process isolation, a userspace API or preemptive application multitasking.
 
-QEMU's standard PC provides a PS/2 mouse by default. Click inside the QEMU
-window to give it input; use QEMU's mouse-grab/release shortcut when needed.
-The shared keyboard/mouse controller routes auxiliary bytes separately so
-pointer packets cannot become typed characters. Initialization resets wheel
-protocols to the standard three-byte mode and only unmasks IRQ12/cascade after
-successful setup. A missing mouse leaves the keyboard usable.
+Keyboard shortcuts: Ctrl+H Home, Ctrl+F Files, Ctrl+S System, Ctrl+N Network,
+Ctrl+A Calc, Ctrl+C Clock, Ctrl+O Notes. **In Notes, Ctrl+S saves instead.**
+Ctrl+G starts the 3D demo; Escape returns to the terminal (or backs out of a
+file preview first). These controls work without a mouse.
 
-**Real-hardware support is limited to a standard PS/2 mouse or compatible
-PS/2 touchpad.** Native USB mice and I2C touchpads need separate drivers.
-Some firmware supplies USB legacy emulation, but this has not been validated.
-The interface falls back to keyboard controls when no PS/2 mouse is detected.
-VGA/legacy BIOS requirements are unchanged; real hardware still needs testing.
+- **Files:** select with click or Up/Down, then Enter/Open, or double-click.
+  Back/Backspace goes up; Prev/Next or PgUp/PgDn changes pages. Lists show up
+  to 128 entries; text previews read at most 8 KiB. The terminal's working
+  directory is restored when leaving the desktop.
+- **System:** memory, storage, uptime and the active video mode.
+- **Network:** Ethernet driver/link, IP/mask/gateway/DNS and packet counts.
+  D or the DHCP button obtains a lease; X/Disconnect clears IPv4 settings.
+  DHCP temporarily returns to the terminal and then restores the desktop.
+  See [NETWORK.md](NETWORK.md) for static settings and supported cards.
+- **Calc:** signed 32-bit integer arithmetic with parentheses and + - * / %.
+  Enter calculates; Ctrl+L clears. Invalid input, overflow and division by
+  zero return an error. Also available as `calc (12 + 3) * 4` in the terminal.
+- **Clock:** hardware RTC date/time and uptime; no time zone conversion/NTP.
+- **Notes:** append text/newlines and erase with Backspace, up to 2,047 bytes.
+  Text stays in RAM across window closure and desktop re-entry until reboot.
+  Ctrl+S explicitly saves `desktop.txt` in the Files app's current folder.
+  The disk must be mounted writable (`mount <n> rw`). Replacing an existing
+  file requires a second Ctrl+S. The app does not automatically load a file;
+  use `edit <file>` for the full-screen editor.
 
-## Keyboard controls
+`apps` lists applications; `about` reports the main platform limitations.
+Network polling continues while windows are open. Disk access, DHCP and other
+blocking kernel operations can pause drawing.
 
-- **H / F / S**: Home / Files / System. **Tab** cycles those panels.
-- **G**: 3D demo. **T**, **Q**, or **Escape**: terminal. Escape in a preview
-  first returns to the file list.
-- **Up/Down** selects a file, **Enter** opens it, **Backspace** goes up/back.
-  **PgUp/PgDn** pages; **Home/End** selects the first/last entry.
+## Hardware and validation
 
-The graphical file browser displays up to 128 entries, ten per page. Previews
-show the first 8 KiB and replace binary bytes with dots. It does not write to
-the filesystem, and restores the terminal's working directory when closed.
-The system panel shows memory, storage and Ethernet link state; a link being
-up does not mean DHCP is configured. Network polling continues in the shell.
+Only standard PS/2 mice and compatible PS/2 touchpads are supported. Native
+USB mice, I2C touchpads and arbitrary GPU high-resolution modes need drivers.
+The mouse bounds follow video mode changes; raw mouse motion still turns the
+3D camera. Real hardware has not been validated. Legacy VGA/BIOS is required;
+800×600 is currently supported on QEMU/Bochs-compatible DISPI video adapters.
 
-This is a cooperative, single-window shell, not a multitasking window manager.
-It safely leaves graphics mode before launching the demo and restores the text
-font and palette between applications. Terminal scrollback is preserved.
-
-## Terminal and tests
-
-Up/Down recalls the last 32 nonempty commands. Down past the newest restores
-unfinished input; commands can be edited before Enter. History lasts until
-reboot. PgUp/PgDn scrolls output; recent output is retained after 1,000 lines.
-
-`make test-mouse-host` tests PS/2 initialization/failure, interleaved keyboard
-and mouse packets, signed motion, clipping, click edges and queue overflow
-with sanitizers. `make test-gui` uses actual QMP mouse events and framebuffer
-pixel/font checks for clicking, previews, mode restoration and mouse-look;
-it also verifies inbound networking while the graphical shell is open.
-`make test-desktop` still tests the text desktop; `make test-history` tests
-command recall. The automated QEMU tests require native Linux QEMU.
+`make test-gui` checks actual framebuffer pixels, QMP mouse dragging,
+minimize/restore/close, app focus, calculator, notes permissions/saving, mode
+restoration and incoming Ethernet traffic during desktop use.
+`make test-mouse-host`, `make test-calc`, `make test-screen` use host sanitizers.
+The QEMU tests use disposable disks and require native Linux QEMU.

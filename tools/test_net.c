@@ -5,14 +5,14 @@
 volatile unsigned long uptime_ticks;
 static unsigned char test_mac[6] = {2,0,0,0,0,1}, sent_packet[1536];
 static unsigned int sent_size, sends;
-int rtl8139_present(void) { return 1; }
-int rtl8139_link(void) { return 1; }
-const unsigned char *rtl8139_mac(void) { return test_mac; }
-int rtl8139_send(const void *p, unsigned int n) {
+int nic_present(void) { return 1; }
+int nic_link(void) { return 1; }
+const unsigned char *nic_mac(void) { return test_mac; }
+int nic_send(const void *p, unsigned int n) {
     if (n > sizeof(sent_packet)) abort();
     memcpy(sent_packet, p, n); sent_size = n; sends++; return 0;
 }
-int rtl8139_receive(unsigned char *p, unsigned int n) { (void)p; (void)n; return 0; }
+int nic_receive(unsigned char *p, unsigned int n) { (void)p; (void)n; return 0; }
 int keyboard_getchar(void) { return -1; }
 void print_string(const char *s) { (void)s; }
 void newline(void) {}
@@ -103,7 +103,16 @@ int main(void) {
         receive_frame(b,n);
     }
     lease_end=0;uptime_ticks=1;net_poll();check(!address&&!gateway&&!dns,"lease expiry clears network config");
+    net_command("netconfig","10.0.2.15 255.255.255.0 10.0.2.2 10.0.2.3");
+    check(address==0x0A00020F && manual,"valid static configuration");
+    uptime_ticks=100000;net_poll();check(address==0x0A00020F,"static configuration does not expire");
+    net_command("netconfig","10.0.2.15 255.0.255.0 10.0.2.2 10.0.2.3");
+    check(address==0x0A00020F && mask==0xFFFFFF00,"invalid config preserves current settings");
+    net_command("netoff","");check(!address && !manual,"disconnect clears configuration");
     puts("PASS: checksums, DHCP matching/validation, DNS compression, malformed/truncated packets,");
     puts("      IPv4/UDP dispatch, fragmentation rejection, ICMP replies and lease expiry");
     return 0;
 }
+
+const char *nic_name(void) { return "Test Ethernet"; }
+void nic_list(void) {}

@@ -4,7 +4,7 @@
 #define MOUSE_QUEUE 64
 static volatile unsigned int head, tail;
 static struct mouse_event events[MOUSE_QUEUE];
-static int present, x = 160, y = 100;
+static int present, x = 160, y = 100, max_x=319, max_y=199;
 static unsigned char packet[3], cycle, buttons;
 
 int mouse_present(void) { return present; }
@@ -21,9 +21,9 @@ void mouse_receive_byte(int value) {
     if (packet[0] & 0xC0) dx = dy = 0; /* overflow: retain buttons, discard motion */
     x += dx; y -= dy;
     if (x < 0) x = 0;
-    if (x > 319) x = 319;
+    if (x > max_x) x = max_x;
     if (y < 0) y = 0;
-    if (y > 199) y = 199;
+    if (y > max_y) y = max_y;
     unsigned char next_buttons = packet[0] & 7;
     unsigned int next = (head + 1) % MOUSE_QUEUE;
     if (next != tail) {
@@ -111,4 +111,17 @@ failed:
     command(0xA7);
     if (config >= 0 && command(0x60)) data((config & ~2) | 0x20);
     command(0xAE); /* a missing mouse must never disable the keyboard */
+}
+
+void mouse_set_bounds(int width,int height) {
+    if (width<1 || height<1 || width>4096 || height>4096) return;
+#ifndef HOST_TEST
+    unsigned int flags;
+    __asm__ volatile ("pushfl; popl %0; cli" : "=r"(flags) : : "memory");
+#endif
+    x=x*width/(max_x+1);y=y*height/(max_y+1);
+    max_x=width-1;max_y=height-1;tail=head;
+#ifndef HOST_TEST
+    if (flags&0x200) sti();
+#endif
 }

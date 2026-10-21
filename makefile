@@ -9,7 +9,8 @@ PYTHON ?= python3
 # Native QEMU works in Linux/WSLg; retain the existing Windows installation as a fallback.
 QEMU ?= $(shell command -v qemu-system-x86_64 2>/dev/null || command -v qemu-system-x86_64.exe 2>/dev/null || { test ! -f /mnt/d/mysys2/ucrt64/bin/qemu-system-x86_64.exe || echo /mnt/d/mysys2/ucrt64/bin/qemu-system-x86_64.exe; })
 # User-mode NAT needs no admin privileges; disable with QEMU_NETWORK=
-QEMU_NETWORK ?= -netdev user,id=net0 -device rtl8139,netdev=net0,romfile=
+QEMU_NIC ?= rtl8139
+QEMU_NETWORK ?= -netdev user,id=net0 -device $(QEMU_NIC),netdev=net0,romfile=
 QEMU_FLAGS ?=
 QEMU_MEMORY ?= 256
 INSTALL_IMAGE = build/install.img
@@ -116,3 +117,12 @@ test-installer-host:
 
 clean:
 	rm -rf *.o $(KERNEL) $(ISO) iso build/install.img
+
+# Choose the Intel Ethernet controller with: make run QEMU_NIC=e1000
+test-calc:
+	@set -e; test_bin=$$(mktemp /tmp/ironos-calc-test.XXXXXX); trap 'rm -f "$$test_bin"' EXIT; $(CC) -std=gnu99 -Wall -Wextra -fno-builtin -fsanitize=address,undefined -DHOST_TEST tools/test_calc.c -o "$$test_bin"; "$$test_bin"
+.PHONY: test-calc
+
+test-e1000-host:
+	@set -e; test_bin=$$(mktemp /tmp/ironos-e1000-test.XXXXXX); trap 'rm -f "$$test_bin"' EXIT; $(CC) -std=gnu99 -Wall -Wextra -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast -fno-builtin -fsanitize=address,undefined -DHOST_TEST tools/test_e1000.c -o "$$test_bin"; "$$test_bin"
+.PHONY: test-e1000-host

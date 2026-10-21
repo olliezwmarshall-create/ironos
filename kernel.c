@@ -25,7 +25,7 @@ void kernel_main(unsigned int magic, unsigned int mbi) {
     installer_init(magic, mbi);
     heap_init();
 
-    rtl8139_init();
+    nic_init();
 
     ata_init();      // find disks: IDE, then SATA (AHCI), then NVMe; then their partitions.
     ahci_init();     // (the first FAT volume gets mounted read-only by the CLI)

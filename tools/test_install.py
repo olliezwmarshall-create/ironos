@@ -8,6 +8,7 @@ import hashlib
 import json
 from pathlib import Path
 import socket
+import shlex
 import subprocess
 import tempfile
 import time
@@ -20,6 +21,7 @@ class VM:
         self.sock.unlink(missing_ok=True)
         flags = ['-display', 'none', '-serial', 'none', '-nic', 'none', '-accel', 'tcg',
                  '-qmp', f'unix:{self.sock},server=on,wait=off', '-no-reboot']
+        flags += shlex.split(getattr(args,'extra_flags',''))
         for firmware in args.firmware:
             flags += ['-L', firmware]
         cmd = ['make', 'run-installed' if installed else 'run', f'QEMU={args.qemu}',
@@ -76,7 +78,7 @@ class VM:
 
     def send(self, cmd):
         for c in cmd + '\n':
-            key = {' ': 'spc', '\n': 'ret', '.': 'dot'}.get(c, c)
+            key = {' ': 'spc', '\n': 'ret', '.': 'dot', '(': 'shift-9', ')': 'shift-0', '*': 'shift-8', '+': 'shift-equal', '/': 'slash', '%': 'shift-5', '-': 'minus', '_': 'shift-minus', '=': 'equal'}.get(c, c)
             if c.isupper():
                 key = 'shift-' + c.lower()
             self.hmp('sendkey ' + key)

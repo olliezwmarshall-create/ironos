@@ -598,13 +598,16 @@ static void run_command(void) {
         say("Files   : ls cd pwd cat hexdump edit touch mkdir rm rmdir cp mv echo");
         say("Tips    : \"quote\" names with spaces; echo hi > file; PgUp/PgDn scroll.");
         say("History : Up/Down recall commands (32 entries, kept until reboot)");
-        say("Network : net  dhcp  ping <IPv4-or-host>  resolve <host>");
+        say("Network : net netcards netauto netoff netconfig dhcp ping resolve");
         say("Graphics: demo3d (software 3D, WASD movement, Esc exits)");
-        say("Desktop : desktop (graphical + mouse)  textdesk (text mode)");
+        say("Desktop : desktop (windows + mouse) textdesk apps calc <expression> about");
         say("Install : install <disk-name> (BIOS/legacy, erases target disk)");
         say("Disks start read-only. The prompt shows '#' once writing is enabled.");
     }
-    else if (!strcmp(cmd, "net") || !strcmp(cmd, "dhcp") || !strcmp(cmd, "ping") || !strcmp(cmd, "resolve")) net_command(cmd, arg);
+    else if (!strcmp(cmd, "net") || !strcmp(cmd, "dhcp") || !strcmp(cmd, "ping") || !strcmp(cmd, "resolve") || !strcmp(cmd,"netcards") || !strcmp(cmd,"netauto") || !strcmp(cmd,"netoff") || !strcmp(cmd,"netconfig")) net_command(cmd, arg);
+    else if (!strcmp(cmd,"calc")) { int n;char b[16];if (calc_eval(arg,&n)) say("Invalid expression, overflow or division by zero.");else { signed_string(n,b);say(b); } }
+    else if (!strcmp(cmd,"apps")) say("desktop: Home, Files, System, Network, Calc, Clock, Notes; demo3d; edit <file>");
+    else if (!strcmp(cmd,"about")) say("IronOS: 32-bit x86 BIOS OS. CPU graphics; IPv4 Ethernet; no TCP/Wi-Fi/USB stack yet.");
     else if (strcmp(cmd, "demo3d") == 0) graphics_demo();
     else if (!strcmp(cmd, "desktop") || !strcmp(cmd, "gui")) gui_run();
     else if (!strcmp(cmd, "textdesk")) desktop_run();

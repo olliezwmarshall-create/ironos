@@ -1,6 +1,9 @@
 # Ethernet networking
 
-IronOS now has a **PCI RTL8139 Ethernet driver** and a small IPv4 stack:
+IronOS automatically selects a supported PCI Ethernet controller: **Intel
+82540EM (8086:100E), 82545EM (8086:100F)**, or **Realtek RTL8139
+(10EC:8139)**. Intel is preferred if both are present; one interface is active.
+It has a small IPv4 stack:
 ARP, DHCP, UDP DNS lookup and ICMP ping/replies. The driver uses the legacy
 RTL8139 datapath, including the compatible interface in QEMU's RTL8139C+.
 This is the first networking layer; TCP, HTTP/HTTPS, sockets, Wi-Fi and USB
@@ -40,7 +43,7 @@ connections need TCP/application support that is not present yet.
 
 Press Escape to cancel a network command. DHCP, ARP and DNS have bounded
 retries/timeouts. Leases expire and disable the old configuration; run `dhcp`
-again to renew. Automatic lease renewal, static IP configuration, IPv6, VLANs,
+again to renew. Automatic lease renewal, IPv6, VLANs,
 IP fragmentation/reassembly and DNS-over-TCP are not implemented.
 
 The driver polls in the terminal, desktop, editor and 3D demo. Incoming ARP
@@ -58,16 +61,44 @@ make run QEMU_NETWORK=
 ```
 
 For a real PC, connect a cable and run `net`. If there is no supported card,
-run `lspci` and note the **vendor:device ID** on the Ethernet/network line.
+run `netcards` or `lspci` and note the **vendor:device ID** on the Ethernet/network line.
 That identifies which driver to add next. Real hardware has not been validated.
 Do not assume an adapter works merely because its PCI class says Ethernet.
+
+## Network settings
+
+`netcards` lists PCI network controllers, their IDs and driver availability.
+Unknown controllers are reported but cannot carry packets. There is no
+universal Wi-Fi/Ethernet/USB driver: Wi-Fi also needs firmware, association
+and authentication; USB adapters need a USB host stack and chipset drivers.
+Neither Wi-Fi nor USB networking is implemented in this version.
+
+`netauto` obtains a DHCP lease (alias of `dhcp`). This is an explicit command,
+not background DHCP at boot. `netoff` clears IPv4 configuration; it does not
+power off the card or remove its driver. Static settings last until reboot
+or the next DHCP/netoff command:
+
+```text
+netconfig 10.0.2.15 255.255.255.0 10.0.2.2 10.0.2.3
+```
+
+Arguments are IP, subnet mask, gateway and DNS. A gateway or DNS of `0.0.0.0`
+omits that setting. Invalid settings preserve the current configuration.
+The Network desktop app shows live settings and offers DHCP/disconnect.
+
+Test Intel Ethernet in WSL with `make run QEMU_NIC=e1000`; ordinary `make run`
+keeps the existing RTL8139 default. Intel support is limited to the listed
+legacy devices, not all cards sold under the Intel/E1000 name.
 
 ## Validation
 
 ```sh
 make test-network-host
 make test-network-driver
+make test-e1000-host
 make test-network
+python3 tools/test_network.py --nic e1000
+python3 tools/test_network_fixture.py --nic e1000 --gui
 ```
 
 The host tests use AddressSanitizer/UndefinedBehaviorSanitizer to exercise

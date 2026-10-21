@@ -256,4 +256,30 @@ void Cli();
 void print_prompt(void);
 void print_disk_summary(void);
 
+// Automatic selection of supported Ethernet controllers.
+void nic_init(void);
+int nic_present(void);
+int nic_link(void);
+const char *nic_name(void);
+const unsigned char *nic_mac(void);
+int nic_send(const void *, unsigned int);
+int nic_receive(unsigned char *, unsigned int);
+void nic_list(void);
+int e1000_init(void);
+int e1000_present(void);
+int e1000_link(void);
+const unsigned char *e1000_mac(void);
+int e1000_send(const void *, unsigned int);
+int e1000_receive(unsigned char *, unsigned int);
+struct net_info { unsigned int ip, mask, gateway, dns, rx, tx, drop; int configured, manual; };
+void net_get_info(struct net_info *info);
+void net_format_ip(unsigned int ip, char *buf);
+
+void mouse_set_bounds(int width,int height);
+void graphics_begin_desktop(void);
+int graphics_width(void);
+int graphics_height(void);
+int graphics_font_height(void);
+int calc_eval(const char *expression,int *result);
+void signed_string(int value,char *buf);
 #endif

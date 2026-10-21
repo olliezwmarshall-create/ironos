@@ -2,7 +2,16 @@
 
 /* VGA mode 13h: a first graphics backend, not an accelerated GPU driver. */
 static unsigned char saved_regs[61], saved_palette[768], saved_font[65536];
-static unsigned char pixels[320 * 200];
+static unsigned char pixels[800 * 600];
+static unsigned int palette[256];
+static volatile unsigned int *lfb;
+static int screen_w=320, screen_h=200;
+int graphics_width(void) { return screen_w; }
+int graphics_height(void) { return screen_h; }
+int graphics_font_height(void) { return lfb?16:8; }
+static unsigned short dispi_read(unsigned short r) { outw(0x1CE,r);return inw(0x1CF); }
+static void dispi_write(unsigned short r,unsigned short v) { outw(0x1CE,r);outw(0x1CF,v); }
+
 static unsigned char text_screen[4000];
 static void reg(unsigned short port, unsigned char index, unsigned char value) {
     outb(port, index); outb(port + 1, value);
@@ -124,6 +133,7 @@ static void frame(int px, int py, unsigned int angle) {
     for (int i = 0; i < 64000; i++) vga[i] = pixels[i];
 }
 void graphics_begin(void) {
+    lfb=0;screen_w=320;screen_h=200;mouse_set_bounds(320,200);
     memcpy(text_screen, (const void *)VGA_ADDRESS, 4000);
     read_regs(saved_regs);
     outb(0x3C7, 0);
@@ -150,10 +160,33 @@ void graphics_begin(void) {
             g = hues[material][1] * light / 24;
             b = hues[material][2] * light / 24;
         } else { r = g = b = i == 255 ? 63 : 42; }
+        palette[i]=((r*255/63)<<16)|((g*255/63)<<8)|(b*255/63);
         outb(0x3C9, r); outb(0x3C9, g); outb(0x3C9, b);
     }
 }
+/* DISPI is available on QEMU standard VGA. Unknown GPUs retain mode 13h.
+ * This is a linear framebuffer backend, still rendered entirely by the CPU. */
+void graphics_begin_desktop(void) {
+    graphics_begin();
+    struct pci_loc loc;
+    if (!pci_find_class(3,0,0xFF,&loc)) return;
+    unsigned int id=pci_read32(loc.bus,loc.dev,loc.fn,0);
+    if (id!=0x11111234 && id!=0xBEEF80EE) return;
+    unsigned int bar=pci_read32(loc.bus,loc.dev,loc.fn,16);
+    if ((bar&1) || !(bar&~15u) || ((bar&6)==4 && pci_read32(loc.bus,loc.dev,loc.fn,20))) return;
+    unsigned int version=dispi_read(0);
+    if (version<0xB0C0 || version>0xB0C5 || dispi_read(10)<30) return;
+    pci_write32(loc.bus,loc.dev,loc.fn,4,(pci_read32(loc.bus,loc.dev,loc.fn,4)&65535)|2);
+    dispi_write(4,0);dispi_write(1,800);dispi_write(2,600);dispi_write(3,32);
+    dispi_write(6,800);dispi_write(8,0);dispi_write(9,0);dispi_write(4,0x41);
+    if (dispi_read(1)!=800 || dispi_read(2)!=600 || dispi_read(3)!=32 || !(dispi_read(4)&1)) {
+        dispi_write(4,0);write_regs(mode13);return;
+    }
+    lfb=(volatile unsigned int *)(bar&~15u);screen_w=800;screen_h=600;mouse_set_bounds(800,600);
+}
 void graphics_end(void) {
+    if (lfb) dispi_write(4,0);
+    lfb=0;screen_w=320;screen_h=200;mouse_set_bounds(320,200);
     volatile unsigned char *vga = (volatile unsigned char *)0xA0000;
     // Establish text mode before loading its font, then restore plane/odd-even state.
     write_regs(saved_regs);
@@ -167,30 +200,29 @@ void graphics_end(void) {
 }
 
 void graphics_rect(int x, int y, int width, int height, unsigned char color) {
-    if (width <= 0 || height <= 0 || x >= 320 || y >= 200) return;
-    if (x < 0) { width += x; x = 0; }
-    if (y < 0) { height += y; y = 0; }
-    if (width <= 0 || height <= 0) return;
-    if (width > 320-x) width=320-x;
-    if (height > 200-y) height=200-y;
-    for (int row=y; row<y+height; row++)
-        for (int col=x; col<x+width; col++) pixels[row*320+col]=color;
+    if (width<=0 || height<=0 || x>=screen_w || y>=screen_h) return;
+    if (x<0) { width+=x;x=0; }
+    if (y<0) { height+=y;y=0; }
+    if (width<=0 || height<=0) return;
+    if (width>screen_w-x) width=screen_w-x;
+    if (height>screen_h-y) height=screen_h-y;
+    for (int row=y;row<y+height;row++) memset(pixels+row*screen_w+x,color,width);
 }
-void graphics_text(int x, int y, const char *s, unsigned char color, int max) {
-    for (int i=0; i<max && s[i]; i++, x+=8) {
-        unsigned char c = s[i];
-        if (c < 32 || c > 126) c = '.';
-        for (int row=0; row<8; row++) {
-            unsigned char bits = saved_font[c*32+row*2] | saved_font[c*32+row*2+1];
-            for (int col=0; col<8; col++)
-                if ((bits & (0x80 >> col)) && x+col>=0 && x+col<320 && y+row>=0 && y+row<200)
-                    pixels[(y+row)*320+x+col]=color;
+void graphics_text(int x,int y,const char *s,unsigned char color,int max) {
+    int fh=graphics_font_height();
+    for (int i=0;i<max && s[i];i++,x+=8) {
+        unsigned char c=s[i];if (c<32 || c>126) c='.';
+        for (int row=0;row<fh;row++) {
+            unsigned char bits=lfb?saved_font[c*32+row]:saved_font[c*32+row*2]|saved_font[c*32+row*2+1];
+            for (int col=0;col<8;col++)
+                if ((bits&(0x80>>col)) && x+col>=0 && x+col<screen_w && y+row>=0 && y+row<screen_h)
+                    pixels[(y+row)*screen_w+x+col]=color;
         }
     }
 }
 void graphics_present(void) {
-    volatile unsigned char *vga = (volatile unsigned char *)0xA0000;
-    for (int i=0; i<64000; i++) vga[i]=pixels[i];
+    if (lfb) { for (int i=0;i<screen_w*screen_h;i++) lfb[i]=palette[pixels[i]]; }
+    else { volatile unsigned char *vga=(volatile unsigned char *)0xA0000;for (int i=0;i<64000;i++) vga[i]=pixels[i]; }
 }
 void graphics_demo(void) {
     print_string("3D demo: W/S move, A/D or mouse turn, Q/E strafe. Esc exits."); newline();

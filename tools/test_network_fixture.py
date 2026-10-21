@@ -194,9 +194,10 @@ def main():
     ap.add_argument('--qemu', default='qemu-system-x86_64')
     ap.add_argument('--firmware', action='append', default=[])
     ap.add_argument('--gui', action='store_true', help='test incoming traffic during the graphical shell')
+    ap.add_argument('--nic',choices=['rtl8139','e1000'],default='rtl8139')
     args = ap.parse_args()
     peer = Peer()
-    args.network = f'-netdev socket,id=net0,connect=127.0.0.1:{peer.port} -device rtl8139,id=nic0,netdev=net0,romfile='
+    args.network = f'-netdev socket,id=net0,connect=127.0.0.1:{peer.port} -device {args.nic},id=nic0,netdev=net0,romfile='
     try:
         with tempfile.TemporaryDirectory(prefix='ironos-net-peer-', dir='/tmp') as tmp:
             work = Path(tmp)
@@ -212,12 +213,12 @@ def main():
                 assert peer.dns_queries == 2, 'DNS was not queried for both commands'
                 if args.gui:
                     vm.send('desktop'); time.sleep(.5)
-                    vm.hmp(f'pmemsave 0xa0000 64000 "{work}/gui.bin"')
-                    assert {224,225,226,232}.issubset(set((work/'gui.bin').read_bytes()))
+                    vm.hmp(f'screendump "{work}/gui.ppm"')
+                    assert (work/'gui.ppm').read_bytes().startswith(b'P6\n800 600\n')
                 else:
                     vm.send('textdesk'); vm.expect('IronOS Desktop')
                 peer.inbound_checks()
-                vm.hmp('sendkey t'); time.sleep(.2)
+                vm.hmp('sendkey '+('esc' if args.gui else 't')); time.sleep(.2)
                 vm.send('memtest'); vm.expect('memtest: PASSED')
                 peer.drop_dhcp = True
                 vm.send('clear'); vm.send('dhcp'); vm.expect('DHCP failed', timeout=18)

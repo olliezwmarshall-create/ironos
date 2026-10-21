@@ -69,6 +69,12 @@ int main(void) {
     check(keyboard_getchar()==KEY_UP&&keyboard_getchar()=='w'&&keyboard_getchar()==-1,"interleaved mouse bytes never become keystrokes");
     check(!keyboard_key_down('w'),"key release preserved");
     check(mouse_get_event(&e)&&e.dx==1,"interleaved mouse packet delivered");
+    mouse_set_bounds(800,600);mouse_get_state(&e);
+    check(e.x<800 && e.y<600,"higher resolution cursor scales inside bounds");
+    for (int i=0;i<5;i++) packet_in(0x08,255,0);
+    mouse_get_state(&e);check(e.x==799,"higher resolution right edge");
+    mouse_set_bounds(320,200);mouse_get_state(&e);
+    check(e.x==319 && e.y<200 && !mouse_get_event(&e),"mode switch rescales and drains stale events");
     // Simulate a missing auxiliary device and verify bounded failure restores keyboard.
     present=0;device_present=0;head=tail=cycle=0;input_head=input_tail=0;
     config=0x41;master_mask=0xFC;slave_mask=0xFF;

@@ -12,12 +12,12 @@
 ## 2. What it can read
 | Works | Doesn't work yet |
 |---|---|
-| IDE/PATA hard disks, and SATA disks when the BIOS has an **IDE / "legacy" / compatibility** mode | SATA in **AHCI** mode, NVMe, USB sticks, SD cards |
-| FAT16 / FAT32 (also read-only FAT12), MBR partitions incl. extended/logical | **NTFS** (Windows XP/Vista/7 default!), exFAT, ext4, GPT-only disks |
-| Disks up to 128 GB (the first 128 GB of bigger ones) | CD/DVD data discs |
+| IDE/PATA, SATA/AHCI, NVMe with 512-byte sectors | USB storage, SD cards, RAID/RST, 4Kn sectors |
+| FAT16 / FAT32 (also read-only FAT12), MBR and GPT partitions | **NTFS**, exFAT, ext4 |
+| Disks up to 2 TB (512-byte LBA addressing) | CD/DVD data discs |
 
 Type `disks` to see what it found. Type `lspci` to see the machine's controllers
-(for IDE it says `legacy ports` = supported, `native mode` = probably not yet; for SATA it says AHCI or not).
+(the driver supports legacy/native IDE, AHCI and the NVMe controllers listed below).
 If the VAIO's Windows partition shows as `NTFS (not supported)`, IronOS can't read it - an NTFS driver is a possible later step.
 A FAT32 partition, or a spare drive formatted FAT32, works today.
 
@@ -48,12 +48,12 @@ WSL `make run` workflow, and booting the installed system with `make run-install
 
 ## Networking
 
-PCI RTL8139 Ethernet is supported through its legacy interface. See
+Intel 82540EM/82545EM and Realtek RTL8139 PCI Ethernet are selected automatically. See
 [NETWORK.md](NETWORK.md) for DHCP, DNS, ping, QEMU NAT and current limitations.
 Wi-Fi and USB network adapters still need separate drivers.
 
 ## Graphical shell and mouse
 
-`desktop` opens the VGA graphical shell; `textdesk` retains the text interface.
+`desktop` opens the windowed desktop (800×600 on DISPI video, VGA fallback); `textdesk` retains the text interface.
 Standard PS/2 mice are supported. Native USB mice and I2C touchpads are not.
 See [DESKTOP.md](DESKTOP.md) for controls and hardware limitations.
